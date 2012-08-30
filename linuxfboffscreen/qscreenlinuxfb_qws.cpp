@@ -287,14 +287,14 @@ QLinuxFbScreenOfs::~QLinuxFbScreenOfs()
 
 bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
 {
-    char gfx_config_fifo[] = GFX_CONFIG_NAMED_PIPE;
-    int gfx_plane_no = 0;
-    float x_pos   = -0.5;
-    float y_pos   = 0.5;
-    float oheight = 1.0;
-    float owidth  = 1.0;
-    int oblend_en = 1;
-    int oglob_alpha_en = 1;
+    char  gfx_config_fifo[] = GFX_CONFIG_NAMED_PIPE;
+    int   gfx_plane_no = 0;  
+    float x_pos   = -1.0;
+    float y_pos   =  1.0;
+    float oheight = 2.0;
+    float owidth  = 2.0;
+    int   oblend_en = 1;
+    int   oglob_alpha_en = 1;
     float oglobal_alpha = 0.5;
     float orotate = 0.0;
 
@@ -305,14 +305,6 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     d_ptr->displaySpec = displaySpec;
 
     const QStringList args = displaySpec.split(QLatin1Char(':'));
-#if 0
-    if (args.contains(QLatin1String("1")))
-        gfx_plane_no = 1;
-    if (args.contains(QLatin1String("2")))
-        gfx_plane_no = 2;
-    if (args.contains(QLatin1String("3")))
-        gfx_plane_no = 3;
-#endif
 
     /* Grphics Plane No */
     QRegExp gfx_no(QLatin1String("gfx_no=?(\\d+)"));
@@ -326,8 +318,13 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         printf (" Error: Exceeding the number of GFX planes supported <0 to 3>\n");
         exit (0);
     }
-    
-    /* X position for the output window */
+   
+
+#ifdef DEBUGGPUCOMP
+    printf (" Graphics Plane number gfx_no: %d\n", gfx_plane_no);
+#endif
+ 
+    /* x position of the output window - normalized device co-ordinate */
     QRegExp xpos(QLatin1String("xpos=?(\\d*\\.\\d+)"));
     int xposIdx = args.indexOf(xpos);
     if (xposIdx >= 0) {
@@ -341,7 +338,10 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
             x_pos = - xposm.cap(1).toFloat();
         }
     }
-    printf (" xpos: %f\n", x_pos);
+
+#ifdef DEBUGGPUCOMP
+    printf (" Output window xpos: %2.2f\n", x_pos);
+#endif
 
     if ( x_pos < -1.0 || x_pos > 1.0 )
     {
@@ -349,7 +349,7 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         exit (0);
     }
 
-    /* Y Position for the output window */
+    /* y position of the output window - normalized device co-ordinate */
     QRegExp ypos(QLatin1String("ypos=?(\\d*\\.\\d+)"));
     int yposIdx = args.indexOf(ypos);
     if (yposIdx >= 0) {
@@ -364,7 +364,9 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
             y_pos = - yposm.cap(1).toFloat();
         }
     }
-    printf (" ypos: %f\n", y_pos);
+#ifdef DEBUGGPUCOMP
+    printf (" Output window ypos: %2.2f\n", y_pos);
+#endif
     if ( y_pos < -1.0 || y_pos > 1.0 )
     {
         printf (" Error: Exceeding the range for ypos <-2.0 to 2.0>\n");
@@ -378,12 +380,17 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         width.exactMatch(args.at(widthIdx));
         owidth = width.cap(1).toFloat();
     } 
-    printf (" Output window width: %f\n", owidth);
+
+#ifdef DEBUGGPUCOMP
+    printf (" Output window width: %2.2f\n", owidth);
+#endif
+
     if ( owidth < 0.0 || owidth > 2.0 )
     {
         printf (" Error: Exceeding the range for width < 0.0 to 2.0>\n");
         exit (0);
     }
+
 
    /* Output window height */
     QRegExp height(QLatin1String("height=?(\\d*\\.\\d+)"));
@@ -392,7 +399,9 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         height.exactMatch(args.at(heightIdx));
         oheight = height.cap(1).toFloat();
     } 
-    printf (" Output window height: %f\n", oheight);
+#ifdef DEBUGGPUCOMP
+    printf (" Output window height: %2.2f\n", oheight);
+#endif
     if ( oheight < 0.0 || oheight > 2.0 )
     {
         printf (" Error: Exceeding the range for width < 0.0 to 2.0>\n");
@@ -414,8 +423,11 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         }
     }
 
+#ifdef DEBUGGPUCOMP
+    printf (" blend_en: %d\n", oblend_en);
+#endif
     
-    /* Check for global alpha enable */
+    /* Check for global or pixel level alpha */
     QRegExp glob_alpha_en(QLatin1String("glob_alpha_en=?(\\d*\\.\\d+)"));
     int glob_alpha_enIdx = args.indexOf(glob_alpha_en);
     if (glob_alpha_enIdx >= 0) {
@@ -429,6 +441,9 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
             oglob_alpha_en = - glob_alpha_enm.cap(1).toFloat();
         }
     }
+#ifdef DEBUGGPUCOMP
+    printf (" glob_alpha_en: %d\n", oglob_alpha_en);
+#endif
 
     /* global_alpha value */
     QRegExp global_alpha(QLatin1String("global_alpha=?(\\d*\\.\\d+)"));
@@ -437,12 +452,14 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         global_alpha.exactMatch(args.at(global_alphaIdx));
         oglobal_alpha = global_alpha.cap(1).toFloat();
     }
-    printf (" Output window global_alpha: %f\n", oglobal_alpha);
     if ( oglobal_alpha < 0.0 || oglobal_alpha > 1.0 )
     {
         printf (" Error: Exceeding the range for global_alpha < 0.0 to 1.0>\n");
         exit (0);
     }
+#ifdef DEBUGGPUCOMP
+    printf ( " global_alpha: %2.2f\n", oglobal_alpha);
+#endif
 
     /* rotate value */
     QRegExp rotate(QLatin1String("rotate=?(\\d*\\.\\d+)"));
@@ -460,11 +477,9 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         }
     }
 
-    printf (" Output window rotate: %f\n", orotate);
-
 #ifdef DEBUGGPUCOMP
-    printf (" Selected Grfx Plane: %d\n", gfx_plane_no);
-#endif    
+    printf (" Output window rotate: %4.2f\n", orotate);
+#endif  
 
     if (args.contains(QLatin1String("nographicsmodeswitch")))
         d_ptr->doGraphicsMode = false;
@@ -644,7 +659,6 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
             printf (" Failed to open  Named Pipe : %s\n", gfx_config_fifo);
             exit(0);
         }
-
 #ifdef DEBUGGPUCOMP
         printf (" Opened successfully the named pipe: %s\n", gfx_config_fifo);
 #endif
@@ -674,10 +688,10 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         gfxCfg.out_g.height        = oheight;
 
 #ifdef DEBUGGPUCOMP
-        printf (" Width:  %d\n", dw);
-        printf (" Height: %d\n", dh);
-        printf (" data_phy: %lx\n", data_phy);
-        printf (" bits_per_pixel: %d", vinfo.bits_per_pixel);
+        printf (" Input Frame Width:  %d\n", dw);
+        printf (" Input Frame Height: %d\n", dh);
+        printf (" Offscreen surface/buffer physical address: %lx\n", data_phy);
+        printf (" Bits per pixel : %d", vinfo.bits_per_pixel);
         printf (" Writing the GFX config to the named pipe: %s\n", gfx_config_fifo);
 #endif
         n = write(fd_gfxplane, &gfxCfg, sizeof(gfxCfg));
