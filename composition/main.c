@@ -414,7 +414,7 @@ void * vidConfigDataThread ( void *threadarg)
     float xpos, ypos, width, height;
     int   vid_plane_no;
     videoConfig_s vidCfgRecvd;
-    char  vid_config_fifo[] = VIDEOCONFIG_FIFO_NAME;
+    char  vid_config_fifo[] = VIDEO_CONFIG_AND_DATA_FIFO_NAME;
 
     vid_plane_no = *(int *)threadarg;
 
