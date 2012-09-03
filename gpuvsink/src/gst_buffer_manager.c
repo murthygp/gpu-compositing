@@ -63,7 +63,7 @@
 #include <cmem.h>
 #include "../../gpucomp.h"
 
-char video_config_fifo[] = VIDEOCONFIG_FIFO_NAME;
+char video_config_fifo[] = VIDEO_CONFIG_AND_DATA_FIFO_NAME;
 
 GST_DEBUG_CATEGORY_EXTERN (gpuvsink_debug);
 #define GST_CAT_DEFAULT gpuvsink_debug
@@ -80,7 +80,7 @@ static CMEM_AllocParams cmem_params = { CMEM_POOL, CMEM_CACHED, 4096 };
 static GstBufferClass *buffer_parent_class = NULL;
 int    fd_video_cfg;
 
-/* video configuration structure, interface from this module to composition using named pipe */
+/* video configuration and data structure, interface from this module to composition using named pipe */
 videoConfig_s videoConfig;
 
 static void
@@ -332,16 +332,13 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
 
   if(n != sizeof(videoConfig))
   {
-    printf("Error in writing to named pipe: %s \n", VIDEOCONFIG_FIFO_NAME);
+    printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
   }
 
 #ifdef DEBUGGPUCOMP
   printf (" writing to the config fifo - %s is successful\n", video_config_fifo);
 #endif
 	
-  /* We no longer need this pipe */
-//  close(fd_video_cfg);
-
   /* construct bufferpool */
   pool = (GstBufferClassBufferPool *)
         gst_mini_object_new (GST_TYPE_BCBUFFERPOOL);
@@ -451,7 +448,7 @@ gst_bcbuffer_flush (GstBufferClassBuffer * buffer)
   GstBufferClassBufferPool *pool = buffer->pool;
 
 #ifdef DEBUGGPUCOMP
-//  printf (" gst_bcbuffer_flush not implmented \n");
+//  printf (" gst_bcbuffer_flush not implemented \n");
 #endif
   
 #if 0

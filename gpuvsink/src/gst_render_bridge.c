@@ -51,7 +51,7 @@
 #include <gst/video/video.h>
 #include "gst_render_bridge.h"
 #include <stdio.h>
-#include "bc_cat.h"
+//#include "bc_cat.h"
 #include <pthread.h>
 
 #include <string.h>
@@ -279,10 +279,10 @@ gst_render_bridge_init (GstBufferClassSink * gpuvsink, GstBufferClassSinkClass *
   gpuvsink->num_buffers = PROP_DEF_QUEUE_SIZE;
 
   /*Initialize config structure with default values*/
-  videoConfig.out.xpos   = 0.0;
-  videoConfig.out.ypos   = 0.0;
-  videoConfig.out.width  = 0.0;
-  videoConfig.out.height = 0.0;
+  videoConfig.out.xpos   = -0.5;
+  videoConfig.out.ypos   =  0.5;
+  videoConfig.out.width  =  1.0;
+  videoConfig.out.height =  1.0;
   videoConfig.channel_no = 0.0;
   videoConfig.in.rotate = 0.0;
 }
@@ -537,8 +537,6 @@ gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
  // videoData.channel_no = videoConfig.channel_no;
   videoData.buf_id     = bcbuf->index;
 
-#if 1
-
   videoConfig.config_data = 0;
   videoConfig.buf_index = bcbuf->index;
 
@@ -546,47 +544,9 @@ gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
 
   if(n != sizeof(videoConfig))
   {
-      printf("Error in writing to named pipe: %s \n", VIDEOCONFIG_FIFO_NAME);
+      printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
   }
   
-#endif 
-
-#if 0 
-  if (first_time)
-  {
-    first_time = 0;
-    video_data_fifo[strlen(video_data_fifo)-1] = '0' + videoConfig.channel_no;
-#ifdef DEBUGGPUCOMP
-    printf (" Opening video data named pipe : %s\n", video_data_fifo);
-#endif
-    fd_viddata_fifo = open(video_data_fifo, O_WRONLY);
-    if(fd_viddata_fifo < 0)
-    {
-        printf (" Failed to open gpuvsink_fifo FIFO - fd: %s\n", fd_viddata_fifo);
-        exit(0);
-    }
-
-#ifdef DEBUGGPUCOMP
-    printf (" Opened video data named pipe : %s\n", fd_viddata_fifo);
-#endif
-  }
- 
-#ifdef DEBUGGPUCOMP
-  printf (" Sendig video frame for gpu compositing Chnl No: %d\n", videoConfig.channel_no); fflush (stdout);
-#endif
-
-  /* Send video frame to gpu composition */
-  n = write(fd_viddata_fifo, &videoData, sizeof(videoData));
-
-  if(n != sizeof(videoData))
-  {
-    printf("Error in writing to queue\n");
-  }
-
-#ifdef DEBUGGPUCOMP
-  printf (" Sent video frame for gpu compositing Chnl No: %d\n",videoConfig.channel_no);
-#endif
-#endif
   gst_buffer_unref(bcbuf);
 
   /* note: it would be nice to know when the driver is done with the buffer..

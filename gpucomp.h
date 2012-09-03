@@ -44,7 +44,7 @@
 
 #define GFX_CONFIG_NAMED_PIPE    "/opt/gpu-compositing/named_pipes/gfx_cfg_plane_X"
 
-#define VIDEOCONFIG_FIFO_NAME "/opt/gpu-compositing/named_pipes/video_cfg_plane_X"
+#define VIDEO_CONFIG_AND_DATA_FIFO_NAME "/opt/gpu-compositing/named_pipes/video_cfg_and_data_plane_X"
 #define VIDEODATA_FIFO_NAME "/opt/gpu-compositing/named_pipes/video_data_plane_X"
 
 #define MAX_GFX_PLANES 4
