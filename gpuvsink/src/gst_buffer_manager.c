@@ -82,6 +82,7 @@ int    fd_video_cfg;
 
 /* video configuration and data structure, interface from this module to composition using named pipe */
 videoConfig_s videoConfig;
+extern int channel_no;
 
 static void
 gst_bcbuffer_finalize (GstBufferClassBuffer * buffer)
@@ -310,10 +311,10 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
   videoConfig.in.fourcc  = gst_video_format_to_fourcc (format);
 
   /* Send the video configuration via named pipe to the composition module */
-  video_config_fifo[strlen(video_config_fifo)-1] = '0' + videoConfig.channel_no;
+  video_config_fifo[strlen(video_config_fifo)-1] = '0' + channel_no;
 
 #ifdef DEBUGGPUCOMP
-  printf (" gst_buffer_manager_new: video buffers allocation successfull for channel_no: %d \n", videoConfig.channel_no);
+  printf (" gst_buffer_manager_new: video buffers allocation successfull for channel_no: %d \n", channel_no);
   printf (" Opening the video config fifo - %s\n", video_config_fifo);
 #endif
 

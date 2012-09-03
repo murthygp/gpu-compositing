@@ -67,6 +67,8 @@ videoConfig_s videoConfig;
 extern int    fd_video_cfg;
 extern videoConfig_s videoConfig;
 
+int channel_no; 
+
 /*Used for unreferencing buffers for deferred rendering architecture */
 GstBufferClassBuffer *bcbuf_queue[MAX_QUEUE]= {NULL, NULL, NULL};
 
@@ -283,7 +285,7 @@ gst_render_bridge_init (GstBufferClassSink * gpuvsink, GstBufferClassSinkClass *
   videoConfig.out.ypos   =  0.5;
   videoConfig.out.width  =  1.0;
   videoConfig.out.height =  1.0;
-  videoConfig.channel_no = 0.0;
+  channel_no = 0.0;
   videoConfig.in.rotate = 0.0;
 }
 
@@ -317,9 +319,9 @@ gst_render_bridge_set_property (GObject * object,
       break;
 
     case PROP_CHANNEL_NO:
-         videoConfig.channel_no = g_value_get_uint (value);
-         if (videoConfig.channel_no < 0 || videoConfig.channel_no > 3) {
-             printf (" Invalid Channel Number: %d   <Valid Range: 0 to 3> \n", videoConfig.channel_no);
+         channel_no = g_value_get_uint (value);
+         if (channel_no < 0 || channel_no > (MAX_GFX_PLANES-1)) {
+             printf (" Invalid Channel Number: %d   <Valid Range: 0 to MAX_GFX_PLANES> \n", channel_no);
              exit (0);
          }
          break;
@@ -492,7 +494,6 @@ gst_render_bridge_buffer_alloc (GstBaseSink * bsink, guint64 offset, guint size,
 static GstFlowReturn
 gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
 {
-  videoData_s videoData;
   GstBufferClassSink *gpuvsink = GST_BCSINK (bsink);
   GstBufferClassBuffer *bcbuf;
   GstBufferClassBuffer *bcbuf_rec;
@@ -533,9 +534,6 @@ gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
 
   //g_signal_emit (gpuvsink, signals[SIG_RENDER], 0, bcbuf->index);
   gst_buffer_ref(bcbuf);
-
- // videoData.channel_no = videoConfig.channel_no;
-  videoData.buf_id     = bcbuf->index;
 
   videoConfig.config_data = 0;
   videoConfig.buf_index = bcbuf->index;

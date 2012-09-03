@@ -61,56 +61,52 @@
 #define BC_PIX_FMT_ARGB     BC_FOURCC('A', 'R', 'G', 'B') /*ARGB 8:8:8:8*/
 typedef struct
 {
-    int enable;                      /* 0 - disable 1 - enable the gfx plane */
-    int input_params_valid;          /* 1 - valid i/p parameters 0 - invalid */
+    int enable;                      /* 1 - enable the gfx plane; 0 - disable */
+    int input_params_valid;          /* 1 - valid i/p parameters; 0 - invalid */
     struct in_g { 
-        unsigned long data_ph_addr;  /* physical address of gfx plane buffer  */
-        int width;                   /* Input gfx plane width in pixels       */
-        int height;                  /* output gfx plane width in pixels      */
+        unsigned long data_ph_addr;  /* physical address of the gfx  buffer   */
+        int width;                   /* gfx plane width in pixels             */
+        int height;                  /* gfx plane height in pixels            */
         unsigned int pixel_format;   /* fourcc pixel format                   */
-        int enable_blending;         /* 1 - blending enabled  0 - disabled    */
-        int enable_global_alpha;     /* 1 - global alpha enabled 0 - disabled */
-                                     /* pixel level alpha gets disabled with  */
-                                     /* enable of global alpha                */
-        float global_alpha;          /* global alpha value                    */
-        float rotate;
+        int enable_blending;         /* 1 - blending enabled;  0 - disabled   */
+        int enable_global_alpha;     /* 1 - global alpha;  0 - pixel alpha    */
+        float global_alpha;          /* global alpha value [0.0 to 1.0]       */
+        float rotate;                /* rotate angle in decimal degrees [-180.0 to 180.0]*/
     } in_g;
   
-   /* output position and width device normalized values */
-    int output_params_valid;         /* 1 - valid i/p parameters 0 - invalid  */
+   /* output window position and resolution in normalized device co-ordinates */
+    int output_params_valid;         /* 1 - valid o/p parameters; 0 - invalid */
     struct out_g {
-        float xpos;   /* x position-device normalized co-ordinate[-1.0 to 1.0]*/
-        float ypos;   /* y position-device normalized co-ordinate[-1.0 to 1.0]*/
-        float width;  /* o/p width  - device normalized co-ordinate[-1.0 to 1.0]*/
-        float height; /* o/p height - device normalized co-ordinate[-1.0 to 1.0]*/
+        float xpos;   /* x position [-1.0 to 1.0] */
+        float ypos;   /* y position [-1.0 to 1.0] */
+        float width;  /*  width  - [0.0 to 2.0], 2.0 correspond to fullscreen width */
+        float height; /*  height - [0.0 to 2.0], 2.0 correspond to fullscreen height */
     } out_g;
 } gfxCfg_s;
-
-typedef struct
-{
-    int buf_id;
-} videoData_s;
 
 #define MAX_VIDEO_BUFFERS_PER_CHANNEL 16
 typedef struct 
 {
-    int config_data;
-    int buf_index;
-    int enable;
-    unsigned int channel_no;
+    int config_data;   /* 1 - config   0 - data */
+    int buf_index;     /* if data, buffer index */
+    int enable;        /* 1 - enable the video plane; 0 - disable */
+
+    /* Video plane config structure */
     struct in {
-        float rotate;
-        int count;         /* Number of buffers */
-        int width;         /* frame width in pixels */
-        int height;        /* frame height in pixels */
-        unsigned int fourcc;    /*buffer pixel format*/
-        unsigned long phyaddr[MAX_VIDEO_BUFFERS_PER_CHANNEL];
+        float rotate;  /* rotate angle in decimal degrees [-180.0 to 180.0]*/
+        int count;     /* Number of video buffers */
+        int width;     /* video frame width in pixels */
+        int height;    /* video frame height in pixels */
+        unsigned int fourcc;    /* pixel format */
+        unsigned long phyaddr[MAX_VIDEO_BUFFERS_PER_CHANNEL]; /* Physical addresses of video buffers */
     } in;
+
+    /* output video window position and resolution in normalized device co-ordinates */
     struct out {
-        float  xpos;
-        float  ypos;
-        float  width;
-        float  height;
+        float  xpos;   /* x position [-1.0 to 1.0] */
+        float  ypos;   /* y position [-1.0 to 1.0] */
+        float  width;  /*  width  - [0.0 to 2.0], 2.0 correspond to fullscreen width */
+        float  height; /*  height - [0.0 to 2.0], 2.0 correspond to fullscreen height */
     } out;
 } videoConfig_s;
 
