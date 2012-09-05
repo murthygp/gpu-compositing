@@ -34,7 +34,9 @@ $(OBJFILES):	%.o: %.c $(HEADERS)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 install:	$(TARGET)
+	mkdir -p $(INST_DEST)
 	install -m 0755 $^ $(INST_DEST)
+	cp ../targetfs/init.sh $(INST_DEST) 
 
 uninstall:
 	cd $(INST_DEST) && rm -f $(TARGET)
