@@ -57,10 +57,25 @@
 #define GL_TEXTURE_STREAM_IMG  0x8C0D
 #define MAX_TEX_BUFS 16
 
-#define FILE_RAW_VIDEO
+//#define FILE_RAW_VIDEO_YUV422
 
-#ifdef FILE_RAW_VIDEO
+#ifdef FILE_RAW_VIDEO_YUV422
 static CMEM_AllocParams params = { CMEM_POOL, CMEM_NONCACHED, 4096 };
+/* vertices for the file raw video */
+GLfloat rect_vertices_file_vid[6][3] =
+{   // x     y     z
+
+   /* 1st Traingle */
+    {-1.0,  1.0,  0.0}, // 0
+    {-1.0, -1.0,  0.0}, // 1
+    { 1.0,  1.0,  0.0}, // 2
+
+   /* 2nd Traingle */
+    { 1.0,  1.0,  0.0}, // 1
+    {-1.0, -1.0,  0.0}, // 0
+    { 1.0, -1.0,  0.0}, // 2
+};
+#endif
 
 
 // Pre-calculated value of PI / 180.
@@ -121,22 +136,6 @@ void matrixRotateZ(float degrees, mat4 matrix)
      matrix[4] = -matrix[1];
      matrix[5] = matrix[0]; 
 }
-
-/* vertices for the file raw video */
-GLfloat rect_vertices_file_vid[6][3] =
-{   // x     y     z
-
-   /* 1st Traingle */
-    {-1.0,  1.0,  0.0}, // 0
-    {-1.0, -1.0,  0.0}, // 1
-    { 1.0,  1.0,  0.0}, // 2
-
-   /* 2nd Traingle */
-    { 1.0,  1.0,  0.0}, // 1
-    {-1.0, -1.0,  0.0}, // 0
-    { 1.0, -1.0,  0.0}, // 2
-};
-#endif
 
 /* shader global objects */
 static int ver_shader, frag_shader;
@@ -339,9 +338,7 @@ void * gfxThread ( void *threadarg)
     gfx_config_fifo[strlen(gfx_config_fifo)-1] = '0' + gfx_plane_no;
 
     while (1) {
-#ifdef DEBUGGPUCOMP
-        printf (" Opening the Named Pipe For GFX plane Config:%d %s\n", gfx_plane_no, gfx_config_fifo);
-#endif
+        DEBUG_PRINTF((" Opening the Named Pipe For GFX plane Config:%d %s\n", gfx_plane_no, gfx_config_fifo));
 
         fd_gfxplane = open(gfx_config_fifo, O_RDONLY);
         if (fd_gfxplane < 0)
@@ -350,9 +347,7 @@ void * gfxThread ( void *threadarg)
             exit(0);
         }
 
-#ifdef DEBUGGPUCOMP
-        printf (" Opened the Named Pipe For GFX plane Config:%d %s\n", gfx_plane_no, gfx_config_fifo);
-#endif
+        DEBUG_PRINTF ((" Opened the Named Pipe For GFX plane Config:%d %s\n", gfx_plane_no, gfx_config_fifo));
 
         while(1)
         {
@@ -422,9 +417,7 @@ void * vidConfigDataThread ( void *threadarg)
     vid_config_fifo[strlen(vid_config_fifo)-1] = '0' + vid_plane_no;
 
   while (1) {
-#ifdef DEBUGGPUCOMP
-    printf (" Opening the Named Pipe For Video plane Config:%d %s\n", vid_plane_no, vid_config_fifo);
-#endif
+    DEBUG_PRINTF((" Opening the Named Pipe For Video plane Config:%d %s\n", vid_plane_no, vid_config_fifo));
 
     fd_vidplane = open(vid_config_fifo, O_RDONLY);
     if (fd_vidplane < 0)
@@ -433,9 +426,7 @@ void * vidConfigDataThread ( void *threadarg)
         exit(0);
     }
 
-#ifdef DEBUGGPUCOMP
-    printf (" Opened the Named Pipe For Video plane Config: %d %s\n", vid_plane_no, vid_config_fifo);
-#endif
+    DEBUG_PRINTF ((" Opened the Named Pipe For Video plane Config: %d %s\n", vid_plane_no, vid_config_fifo));
 
     while(1)
     {
@@ -551,11 +542,8 @@ void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no)
     }
     *bc_id_p = bc_id;   /* store the device id */
 
-    
-#ifdef DEBUGGPUCOMP
-    printf (" bc_id: %d  gfx_plane_no: %d  data_ph_addr: %lx \n", bc_id, gfx_plane_no, gfxCfg[gfx_plane_no].in_g.data_ph_addr);
+    DEBUG_PRINTF ((" bc_id: %d  gfx_plane_no: %d  data_ph_addr: %lx \n", bc_id, gfx_plane_no, gfxCfg[gfx_plane_no].in_g.data_ph_addr));
 
-#endif
     /* set the gfx plane buffer address as the texture address */
     if ( modify_bufAddr (bc_id, 0, gfxCfg[gfx_plane_no].in_g.data_ph_addr) < 0)
     {
@@ -587,9 +575,7 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
 
     bc_id = *bc_id_p;
 
-#ifdef DEBUGGPUCOMP
-    printf (" bc_id: %d  vid_plane_no: %d  recreating the video textures \n", bc_id, vid_plane_no);
-#endif
+    DEBUG_PRINTF ((" bc_id: %d  vid_plane_no: %d  recreating the video textures \n", bc_id, vid_plane_no));
 
     if (bc_id < 0)
     {
@@ -637,10 +623,10 @@ int main(int argc, char *argv[])
     int fcount = 0;
     int   profiling   = 0;
 
-#ifdef FILE_RAW_VIDEO
+#ifdef FILE_RAW_VIDEO_YUV422
     int file_video = 0;
     int file_buf_idx = 0;
-    int bcdevid_file_vid;
+    int bcdevid_file_vid = -1;;
     GLuint tex_obj_file_vid; 
     int   iwidth      = 720;
     int   iheight     = 480;
@@ -664,7 +650,7 @@ int matrixLocation;
             break;
         switch (c) {
 
-#ifdef FILE_RAW_VIDEO
+#ifdef FILE_RAW_VIDEO_YUV422
             case 'f':
                 file_video = atoi(optarg);
                 break;
@@ -699,7 +685,7 @@ int matrixLocation;
                 return 0;
         }
     }
-    printf (" LED Wall Application: Blending Graphics w/ video \n");
+    DEBUG_PRINTF ((" Compositing Video and Graphics planes  \n"));
 
     for (i = 0; i < MAX_GFX_PLANES; i++) 
     {
@@ -715,7 +701,7 @@ int matrixLocation;
 
 
 
-#ifdef FILE_RAW_VIDEO
+#ifdef FILE_RAW_VIDEO_YUV422
     if (file_video) {
         rect_vertices_file_vid[0][0] = video_x;
         rect_vertices_file_vid[0][1] = video_y;
@@ -735,16 +721,16 @@ int matrixLocation;
         rect_vertices_file_vid[5][0] = video_x + video_width;
         rect_vertices_file_vid[5][1] = video_y - video_height;
 
-        printf (" input file video frame width: %d\n", iwidth);
-        printf (" input file video frame height: %d\n", iheight);
-        printf (" number of input frames/texture buffers : %d\n", MAX_TEX_BUFS);
-        printf (" profiling Enable/Disbale %d\n", profiling);
-        printf (" raw YUV422 input file : %s\n", infile);
+        DEBUG_PRINTF((" input file video frame width: %d\n", iwidth));
+        DEBUG_PRINTF((" input file video frame height: %d\n", iheight));
+        
+        DEBUG_PRINTF((" profiling Enable/Disbale %d\n", profiling));
+        DEBUG_PRINTF((" raw YUV422 input file : %s\n", infile));
 
-        printf (" video_x: %f\n", video_x);
-        printf (" video_y: %f\n", video_y);
-        printf (" video_width: %f\n", video_width);
-        printf (" video_height: %f\n", video_height);
+        DEBUG_PRINTF((" video_x: %f\n", video_x));
+        DEBUG_PRINTF((" video_y: %f\n", video_y));
+        DEBUG_PRINTF((" video_width: %f\n", video_width));
+        DEBUG_PRINTF((" video_height: %f\n", video_height));
 
         CMEM_init();
 
@@ -766,9 +752,9 @@ int matrixLocation;
             exit(1);
         }
         yuv_ptr = (char *)vidStreamBufVa;
-        printf (" Loading YUV422 data from file ......");fflush(stdout);
+        DEBUG_PRINTF((" Loading YUV422 data from file ......"));fflush(stdout);
         fread( yuv_ptr ,1, (iwidth*iheight*2*MAX_TEX_BUFS), fin);
-        printf (" Finished ......\n");
+        DEBUG_PRINTF((" Finished ......\n"));
         fclose (fin);
     }
 #endif
@@ -781,9 +767,8 @@ int matrixLocation;
     {
         vidCfgPlanes[i] = i;
         pthread_create(&vidCfgtid[i], NULL, vidConfigDataThread, (void *) &vidCfgPlanes[i]);
-#ifdef DEBUGGPUCOMP
-        printf (" Created Thread for Video plane %d\n", i);
-#endif
+
+        DEBUG_PRINTF ((" Created Thread for Video plane %d\n", i));
     }
 
     /* Threads for Graphics Planes */
@@ -791,9 +776,8 @@ int matrixLocation;
     {
         gfx_planes[i] = i;
         pthread_create(&gfxtid[i], NULL, gfxThread, (void *) &gfx_planes[i]);
-#ifdef DEBUGGPUCOMP
-        printf (" Created Thread for GFX plane %d\n", i);
-#endif
+
+        DEBUG_PRINTF ((" Created Thread for GFX plane %d\n", i));
     }
 
     if (initEGL(NULL, NULL, profiling)) {
@@ -810,7 +794,7 @@ int matrixLocation;
 
     glActiveTexture(GL_TEXTURE0);
    
-#ifdef FILE_RAW_VIDEO
+#ifdef FILE_RAW_VIDEO_YUV422
     if (file_video) 
     {
         glGenTextures (1, &tex_obj_file_vid);
@@ -838,7 +822,7 @@ int matrixLocation;
     while (!gQuit) {
         glClear(GL_COLOR_BUFFER_BIT);
 
-#ifdef FILE_RAW_VIDEO
+#ifdef FILE_RAW_VIDEO_YUV422
         /* ------------------------------------------------------------------*/
         /* File Video Texturing                                              */
         /* ------------------------------------------------------------------*/
@@ -869,12 +853,9 @@ int matrixLocation;
             {
                 if (vid_plane_mdfd[i] > 0)
                 {
-#ifdef DEBUGGPUCOMP
-                    printf (" Vid plane %d Updated \n", i);
-#endif
+                    DEBUG_PRINTF ((" Vid plane %d Updated \n", i));
                     recreate_vid_texture (&bcdevid_vid[i], i);
                     matrixRotateZ(vidCfg[i].in.rotate, matvid[i]);
-                    printf (" vidCfg[i].in.rotate: %f\n", vidCfg[i].in.rotate);
                     vid_plane_mdfd[i] = 0;
 
                 }
@@ -907,12 +888,9 @@ int matrixLocation;
                 /* Update the gfx plane if modified */
                 if (gfx_plane_mdfd[i] > 0) 
                 {
-#ifdef DEBUGGPUCOMP
-                    printf (" GFX plane %d Updated \n", i);
-#endif
+                    DEBUG_PRINTF ((" GFX plane %d Updated \n", i));
                     recreate_gfx_texture (&bcdevid_gfx[i], i);
                     matrixRotateZ(gfxCfg[i].in_g.rotate, matgfx[i]);
-                    printf (" rotate = %f\n", gfxCfg[i].in_g.rotate);
                     gfx_plane_mdfd[i] = 0;
                 }
                 glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matgfx[i]);

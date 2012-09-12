@@ -128,11 +128,12 @@ int initEGL(int *surf_w, int *surf_h, int profile)
     EGLint            n_cfgs;
     EGLint            egl_attr[] = {
                          EGL_BUFFER_SIZE, EGL_DONT_CARE,
+#if 0
                          EGL_RED_SIZE,    8,
                          EGL_GREEN_SIZE,  8,
                          EGL_BLUE_SIZE,   8,
                          EGL_DEPTH_SIZE,  8,
-
+#endif
                          EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
   
                          EGL_NONE };
@@ -209,8 +210,6 @@ int init_bcdev (unsigned int pix_frmt, int width, int height, int num_bufs)
     char bcdev_name[] = "/dev/bccatX";
     BCIO_package ioctl_var;
     bc_buf_params_t buf_param;
-
-    printf (" pix_frmt: %ulx\n",pix_frmt); 
 
     buf_param.width  = width;
     buf_param.height = height;

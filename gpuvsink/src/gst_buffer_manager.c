@@ -289,19 +289,15 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
 
   vidStreamBufPa = CMEM_getPhys(vidStreamBufVa);
  
-#ifdef DEBUGGPUCOMP
-  printf (" Number of texture buffers: %d\n", count); 
-  printf (" Video Frame Width: %d\n", width);
-  printf (" Video Frame Height: %d\n", height);
-#endif
+  DEBUG_PRINTF((" Number of texture buffers: %d\n", count)); 
+  DEBUG_PRINTF((" Video Frame Width: %d\n", width));
+  DEBUG_PRINTF((" Video Frame Height: %d\n", height));
 
   /* Divide the single block of contiguous memory into the requested number of buffers */
   for (i = 0; i < count; i++)
   {
     videoConfig.in.phyaddr[i] = vidStreamBufPa + (width*height*BPP*i); 
-#ifdef DEBUGGPUCOMP
-    printf (" TextureBufAddr %d: %lx\n", i, videoConfig.in.phyaddr[i]);
-#endif
+    DEBUG_PRINTF ((" TextureBufAddr %d: %lx\n", i, videoConfig.in.phyaddr[i]));
   }
   videoConfig.enable = 1;
   videoConfig.config_data = 1;
@@ -313,10 +309,8 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
   /* Send the video configuration via named pipe to the composition module */
   video_config_fifo[strlen(video_config_fifo)-1] = '0' + channel_no;
 
-#ifdef DEBUGGPUCOMP
-  printf (" gst_buffer_manager_new: video buffers allocation successfull for channel_no: %d \n", channel_no);
-  printf (" Opening the video config fifo - %s\n", video_config_fifo);
-#endif
+  DEBUG_PRINTF ((" gst_buffer_manager_new: video buffers allocation successfull for channel_no: %d \n", channel_no));
+  DEBUG_PRINTF ((" Opening the video config fifo - %s\n", video_config_fifo));
 
   fd_video_cfg = open(video_config_fifo, O_WRONLY);
   if(fd_video_cfg < 0)
@@ -325,9 +319,7 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
     exit(0);
   }
 
-#ifdef DEBUGGPUCOMP
-  printf (" writing to the config fifo - %s \n", video_config_fifo);
-#endif
+  DEBUG_PRINTF ((" writing to the config fifo - %s \n", video_config_fifo));
 
   n = write(fd_video_cfg, &videoConfig, sizeof(videoConfig));
 
@@ -336,10 +328,8 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
     printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
   }
 
-#ifdef DEBUGGPUCOMP
-  printf (" writing to the config fifo - %s is successful\n", video_config_fifo);
-#endif
-	
+  DEBUG_PRINTF ((" writing to the config fifo - %s is successful\n", video_config_fifo));
+
   /* construct bufferpool */
   pool = (GstBufferClassBufferPool *)
         gst_mini_object_new (GST_TYPE_BCBUFFERPOOL);
@@ -448,9 +438,7 @@ gst_bcbuffer_flush (GstBufferClassBuffer * buffer)
 {
   GstBufferClassBufferPool *pool = buffer->pool;
 
-#ifdef DEBUGGPUCOMP
-//  printf (" gst_bcbuffer_flush not implemented \n");
-#endif
+// DEBUG_PRINTF ((" gst_bcbuffer_flush not implemented \n"));
   
 #if 0
   BCIO_package param;

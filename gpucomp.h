@@ -41,6 +41,14 @@
 #ifndef __GPUCOMP_H__
 #define __GPUCOMP_H__
 
+//#define DEBUG
+
+#ifdef  DEBUG
+#define DEBUG_PRINTF(x) printf x
+#else
+#define DEBUG_PRINTF(x)
+#endif
+
 
 #define GFX_CONFIG_NAMED_PIPE    "/opt/gpu-compositing/named_pipes/gfx_cfg_plane_X"
 
@@ -49,9 +57,6 @@
 
 #define MAX_GFX_PLANES 4
 #define MAX_VID_PLANES 4
-
-#define DEBUGGPUVSINK
-#define DEBUGGPUCOMP
 
 /* Graphics Plane Config Structure */
 #define BC_FOURCC(a,b,c,d) \
