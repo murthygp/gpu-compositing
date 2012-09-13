@@ -269,8 +269,6 @@ int reinit_bcdev (unsigned int pix_frmt, int width, int height, int num_bufs, in
 
     deinit_bcdev (bcdevId);
 
-   printf (" pix_frmt: %ulx\n",pix_frmt);
-
     buf_param.width  = width;
     buf_param.height = height;
     buf_param.count  = num_bufs;
