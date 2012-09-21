@@ -401,36 +401,23 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     }
 
     /* Check for blend enable */
-    QRegExp blend_en(QLatin1String("blend_en=?(\\d*\\.\\d+)"));
+    QRegExp blend_en(QLatin1String("blend_en=?(\\d+)"));
     int blend_enIdx = args.indexOf(blend_en);
     if (blend_enIdx >= 0) {
         blend_en.exactMatch(args.at(blend_enIdx));
-        oblend_en = blend_en.cap(1).toFloat();
-    } else {
-        QRegExp blend_enm(QLatin1String("blend_en=-?(\\d*\\.\\d+)"));
-        int blend_enmIdx = args.indexOf(blend_enm);
-        if (blend_enmIdx >= 0) {
-            blend_enm.exactMatch(args.at(blend_enmIdx));
-            oblend_en = - blend_enm.cap(1).toFloat();
-        }
+        oblend_en = blend_en.cap(1).toInt();
     }
 
     DEBUG_PRINTF ((" blend_en: %d\n", oblend_en));
     
     /* Check for global or pixel level alpha */
-    QRegExp glob_alpha_en(QLatin1String("glob_alpha_en=?(\\d*\\.\\d+)"));
+    QRegExp glob_alpha_en(QLatin1String("glob_alpha_en=?(\\d+)"));
     int glob_alpha_enIdx = args.indexOf(glob_alpha_en);
     if (glob_alpha_enIdx >= 0) {
         glob_alpha_en.exactMatch(args.at(glob_alpha_enIdx));
-        oglob_alpha_en = glob_alpha_en.cap(1).toFloat();
-    } else {
-        QRegExp glob_alpha_enm(QLatin1String("glob_alpha_en=-?(\\d*\\.\\d+)"));
-        int glob_alpha_enmIdx = args.indexOf(glob_alpha_enm);
-        if (glob_alpha_enmIdx >= 0) {
-            glob_alpha_enm.exactMatch(args.at(glob_alpha_enmIdx));
-            oglob_alpha_en = - glob_alpha_enm.cap(1).toFloat();
-        }
-    }
+        oglob_alpha_en = glob_alpha_en.cap(1).toInt();
+    } 
+
     DEBUG_PRINTF ((" glob_alpha_en: %d\n", oglob_alpha_en));
 
     /* global_alpha value */
@@ -438,7 +425,7 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     int global_alphaIdx = args.indexOf(global_alpha);
     if (global_alphaIdx >= 0) {
         global_alpha.exactMatch(args.at(global_alphaIdx));
-        oglobal_alpha = global_alpha.cap(1).toFloat();
+        oglobal_alpha = global_alpha.cap(1).toInt();
     }
     if ( oglobal_alpha < 0.0 || oglobal_alpha > 1.0 )
     {
