@@ -425,7 +425,7 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     int global_alphaIdx = args.indexOf(global_alpha);
     if (global_alphaIdx >= 0) {
         global_alpha.exactMatch(args.at(global_alphaIdx));
-        oglobal_alpha = global_alpha.cap(1).toInt();
+        oglobal_alpha = global_alpha.cap(1).toFloat();
     }
     if ( oglobal_alpha < 0.0 || oglobal_alpha > 1.0 )
     {
