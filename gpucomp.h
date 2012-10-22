@@ -58,6 +58,10 @@
 #define MAX_GFX_PLANES 4
 #define MAX_VID_PLANES 4
 
+/* GFX plane configuration delay in milliseconds to accomodate for the initial
+   scene draw time by Qt */
+#define GFX_CONFIG_DELAY_MS 1000 
+
 /* Graphics Plane Config Structure */
 #define BC_FOURCC(a,b,c,d) \
     ((unsigned long) ((a) | (b)<<8 | (c)<<16 | (d)<<24))

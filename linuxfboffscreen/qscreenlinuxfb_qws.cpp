@@ -68,6 +68,8 @@
 
 static CMEM_AllocParams params = { CMEM_POOL, CMEM_NONCACHED, 4096 };
 
+//static CMEM_AllocParams params = { CMEM_POOL, CMEM_CACHED, 4096 };
+
 #define QT_OPEN open
 #define QT_WRITE write
 #define QT_CLOSE close
@@ -608,7 +610,7 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     size = h * lstep;
 
     mapsize = finfo.smem_len;
-
+    
     data = (unsigned char *)-1;
     if (d_ptr->fd != -1) {
 #if 0
@@ -617,8 +619,10 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
 #endif
         CMEM_init();
         data =  (unsigned char *)CMEM_alloc(mapsize, &params);
-//        memset (data, 0, mapsize);
+        memset (data, 0, mapsize);
         data_phy = CMEM_getPhys(data);
+        
+        data_phy += dataoffset;
 
         gfx_config_fifo[strlen(gfx_config_fifo)-1] = '0' + gfx_plane_no;
         DEBUG_PRINTF ((" Opening the named pipe: %s\n", gfx_config_fifo));
@@ -662,7 +666,7 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         DEBUG_PRINTF ((" Writing the GFX config to the named pipe: %s\n", gfx_config_fifo));
 
         n = write(fd_gfxplane, &gfxCfg, sizeof(gfxCfg));
-        DEBUG_PRINTF ((" Wrote the GFX config to the named pipe"));
+        DEBUG_PRINTF ((" Wrote the GFX config to the named pipe\n"));
 
     }
 

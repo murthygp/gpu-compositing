@@ -78,6 +78,9 @@ GLfloat rect_vertices_file_vid[6][3] =
 #endif
 
 
+/* Variables to dealy the gfx plane config */
+struct timeval tvp_gfxconfig_delay[MAX_GFX_PLANES], tv_gfxconfig_delay[MAX_GFX_PLANES];
+
 // Pre-calculated value of PI / 180.
 #define kPI180   0.017453
 
@@ -320,6 +323,7 @@ void usage(char *arg)
            "\t-m  y_pos of output video window  - Normalized Device Co-ordinates (-1.0 to +1.0) \n"
            "\t-n  Output video window width  - Normalized Device Co-ordinates (-1.0 to +1.0) \n"
            "\t-o  Output video window height - Normalized Device Co-ordinates (-1.0 to +1.0) \n"
+           "\t-d  Graphics Plane config delay in milliseconds \n"
            "\t-h - print this message\n\n", arg);
 }
 
@@ -368,6 +372,7 @@ void * gfxThread ( void *threadarg)
             if (gfxCfgRecvd.input_params_valid)
             {
                 gfx_plane_mdfd[gfx_plane_no] = 1;
+                gettimeofday(&tvp_gfxconfig_delay[gfx_plane_no], NULL);
             }
             
             /* process the output parameters if they are valid only  */
@@ -518,7 +523,6 @@ static int setup_shaders( )
 }
 
 GLuint tex_obj_gfx[MAX_GFX_PLANES];
-GLuint tex_obj_gfx_created[MAX_GFX_PLANES] = {0, 0, 0, 0};
 
 /* GFX plane update - recreates the texture based on the change in input parameters */
 void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no) 
@@ -537,32 +541,25 @@ void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no)
     } else 
     {
         /* close and re-open the device with the new texture parameters */
+        glDeleteTextures(1, &tex_obj_gfx[gfx_plane_no]);
         bc_id = reinit_bcdev (gfxCfg[gfx_plane_no].in_g.pixel_format,gfxCfg[gfx_plane_no].in_g.width, gfxCfg[gfx_plane_no].in_g.height, 1, bc_id);
-
     }
-    *bc_id_p = bc_id;   /* store the device id */
-
-    DEBUG_PRINTF ((" bc_id: %d  gfx_plane_no: %d  data_ph_addr: %lx \n", bc_id, gfx_plane_no, gfxCfg[gfx_plane_no].in_g.data_ph_addr));
 
     /* set the gfx plane buffer address as the texture address */
     if ( modify_bufAddr (bc_id, 0, gfxCfg[gfx_plane_no].in_g.data_ph_addr) < 0)
     {
-        exit(0);
+            exit(0);
     }
-    if (tex_obj_gfx_created[gfx_plane_no]) 
-    { 
-       glDeleteTextures(1, &tex_obj_gfx[gfx_plane_no]);
-    }
-    tex_obj_gfx_created[gfx_plane_no] = 1;
-
-    /* Set the texture attributes */
     glGenTextures(1, &tex_obj_gfx[gfx_plane_no]);
     glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_gfx[gfx_plane_no]);
     glTexParameterf(GL_TEXTURE_STREAM_IMG, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_STREAM_IMG, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-//    glTexBindStreamIMG (bc_id, 0);
-}
 
+    *bc_id_p = bc_id;   /* store the device id */
+
+    DEBUG_PRINTF ((" bc_id: %d  gfx_plane_no: %d  data_ph_addr: %lx \n", bc_id, gfx_plane_no, gfxCfg[gfx_plane_no].in_g.data_ph_addr));
+
+}
 
 /* Video texture object creation */
 GLuint tex_obj_vid_created[MAX_VID_PLANES] = {0,0,0,0}; 
@@ -589,7 +586,7 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
     }
     *bc_id_p = bc_id;
 
-    for (i = 0; i < vidCfg[vid_plane_no].in.count; i++) 
+    for (i = 0; i < vidCfg[vid_plane_no].in.count; i++)
     {
         if ( modify_bufAddr (bc_id, i, vidCfg[vid_plane_no].in.phyaddr[i]) < 0)
         {
@@ -638,9 +635,10 @@ int main(int argc, char *argv[])
     unsigned long TextureBufsPa[256];
     float video_x = -0.5, video_y = 0.5, video_width = 1.0, video_height = 1.0;
 #endif
-int matrixLocation;
+    int matrixLocation;
+    unsigned long gfxconfig_delay = GFX_CONFIG_DELAY_MS;
 
-    char opts[] = "f:i:a:b:p:l:m:n:o:h";
+    char opts[] = "f:i:a:b:p:l:m:n:o:d:h";
 
     signal(SIGINT, signalHandler);
 
@@ -679,6 +677,9 @@ int matrixLocation;
            case 'p':
                 profiling = atoi(optarg);
                 break;
+           case 'd':
+                gfxconfig_delay = (unsigned long) atoi(optarg);
+                break;
      
            default:
                 usage(argv[0]);
@@ -686,6 +687,8 @@ int matrixLocation;
         }
     }
     DEBUG_PRINTF ((" Compositing Video and Graphics planes  \n"));
+    DEBUG_PRINTF((" Gfx Config Delay : %lu\n", gfxconfig_delay));
+
 
     for (i = 0; i < MAX_GFX_PLANES; i++) 
     {
@@ -698,8 +701,6 @@ int matrixLocation;
         matrixRotateZ(0, matvid[i]);
 
     }
-
-
 
 #ifdef FILE_RAW_VIDEO_YUV422
     if (file_video) {
@@ -759,6 +760,7 @@ int matrixLocation;
     }
 #endif
 
+    /* Clear the gfx and video config structures */
     memset(gfxCfg, 0, sizeof(gfxCfg_s)*MAX_GFX_PLANES);
     memset(vidCfg, 0, sizeof(videoConfig_s)*MAX_VID_PLANES);
 
@@ -780,10 +782,13 @@ int matrixLocation;
         DEBUG_PRINTF ((" Created Thread for GFX plane %d\n", i));
     }
 
+    /* EGL Initialization */
     if (initEGL(NULL, NULL, profiling)) {
         printf("ERROR: init EGL failed\n");
         exit (0);
     }
+
+    /* Shader setup */
     if (setup_shaders () < 0)
     {
       printf (" ERROR: setup shader faileed \n");
@@ -813,6 +818,7 @@ int matrixLocation;
     }
 #endif
 
+    /* clear color is set to black */
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     glUniform1i(glGetUniformLocation(program, "sTexture"), 0);
@@ -845,9 +851,9 @@ int matrixLocation;
 #endif
 
         /* ------------------------------------------------------------------*/
-        /* Video Texturing                                                */
+        /* Video plane Config                                                */
         /* ------------------------------------------------------------------*/
-        for (i=0; i < MAX_GFX_PLANES; i++)
+        for (i=0; i < MAX_VID_PLANES; i++)
         {
             if (vidCfg[i].enable)
             {
@@ -859,6 +865,43 @@ int matrixLocation;
                     vid_plane_mdfd[i] = 0;
 
                 }
+            }
+        }
+
+        /* ------------------------------------------------------------------*/
+        /* Graphics Plane config                                             */
+        /* ------------------------------------------------------------------*/
+        for (i=0; i < MAX_GFX_PLANES; i++)
+        {
+            if (gfxCfg[i].enable)
+            {
+                /* Update the gfx plane if modified */
+                if (gfx_plane_mdfd[i] > 0)
+                {
+                   /* Delay the gfx plane config to accomodate for the qt draw time for *
+                    * the initial scene */
+                    gettimeofday(&tv_gfxconfig_delay[i], NULL);
+                    tdiff = (unsigned long)(tv_gfxconfig_delay[i].tv_sec*1000 + tv_gfxconfig_delay[i].tv_usec/1000 -
+                                tvp_gfxconfig_delay[i].tv_sec*1000 - tvp_gfxconfig_delay[i].tv_usec/1000);
+
+                    if (tdiff > gfxconfig_delay)
+                    {
+                        DEBUG_PRINTF ((" GFX plane %d Updated \n", i));
+                        recreate_gfx_texture (&bcdevid_gfx[i], i);
+                        matrixRotateZ(gfxCfg[i].in_g.rotate, matgfx[i]);
+                        gfx_plane_mdfd[i] = 0;
+                    }
+                }
+            }
+        }
+
+        /* ------------------------------------------------------------------*/
+        /* Video Texturing                                                */
+        /* ------------------------------------------------------------------*/
+        for (i=0; i < MAX_VID_PLANES; i++)
+        {
+            if (vidCfg[i].enable)
+            {
                 glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matvid[i]);
 
                 glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_vid[i]);
@@ -875,24 +918,16 @@ int matrixLocation;
                 glDisableVertexAttribArray (1);
             }
         }
-        /*-------------------------------------------------------------------*/
-
 
         /* ------------------------------------------------------------------*/
         /* Graphics Texturing                                                */
         /* ------------------------------------------------------------------*/
         for (i=0; i < MAX_GFX_PLANES; i++)
         {
-            if (gfxCfg[i].enable)
+
+            /* Draw only if the plane configuration is done */
+            if (gfxCfg[i].enable && (gfx_plane_mdfd[i] == 0))
             {
-                /* Update the gfx plane if modified */
-                if (gfx_plane_mdfd[i] > 0) 
-                {
-                    DEBUG_PRINTF ((" GFX plane %d Updated \n", i));
-                    recreate_gfx_texture (&bcdevid_gfx[i], i);
-                    matrixRotateZ(gfxCfg[i].in_g.rotate, matgfx[i]);
-                    gfx_plane_mdfd[i] = 0;
-                }
                 glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matgfx[i]);
 
                 glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_gfx[i]);
@@ -909,8 +944,8 @@ int matrixLocation;
                                      GL_ONE_MINUS_CONSTANT_ALPHA);
                     } else 
                     {
-                        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                    }
+                            glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                    } 
                 }
 
                 /* Draw the plane */
@@ -930,7 +965,6 @@ int matrixLocation;
             } 
         }
         /*-------------------------------------------------------------------*/
-
         eglSwapBuffers(dpy, surface);
 
         if (profiling == 0)
