@@ -604,6 +604,7 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     }
 
     dataoffset = yoff * lstep + xoff * d / 8;
+    dataoffset = 0;
     //qDebug("Using %dx%dx%d screen",w,h,d);
 
     /* Figure out the size of the screen in bytes */
@@ -618,12 +619,10 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
                                      MAP_SHARED, d_ptr->fd, 0);
 #endif
         CMEM_init();
-        data =  (unsigned char *)CMEM_alloc(mapsize, &params);
-        memset (data, 0, mapsize);
+        data =  (unsigned char *)CMEM_alloc(size, &params);
+        memset (data, 0, size);
         data_phy = CMEM_getPhys(data);
         
-        data_phy += dataoffset;
-
         gfx_config_fifo[strlen(gfx_config_fifo)-1] = '0' + gfx_plane_no;
         DEBUG_PRINTF ((" Opening the named pipe: %s\n", gfx_config_fifo));
 
