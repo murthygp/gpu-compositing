@@ -141,21 +141,23 @@ void matrixRotateZ(float degrees, mat4 matrix)
 }
 
 /* shader global objects */
-static int ver_shader, frag_shader;
-int program;
+static int ver_shader, frag_shader, frag_shader_rbswap;
+int program, program_rbswap;
 static int setup_shaders();
 char buf[1024];
 
 /* Graphics Planes Global variables */ 
 pthread_t     gfxtid[MAX_GFX_PLANES];
 gfxCfg_s  gfxCfg[MAX_GFX_PLANES];
-int gfx_plane_mdfd[MAX_GFX_PLANES] = {-1, -1, -1, -1};
+int gfx_plane_mdfd[MAX_GFX_PLANES];
 
 /* Video Planes Global varibles */
 pthread_t     vidCfgtid[MAX_VID_PLANES];
 videoConfig_s vidCfg[MAX_VID_PLANES];
-int           vid_plane_mdfd[MAX_VID_PLANES] = {-1, -1, -1, -1};
-int           vid_data_idx [MAX_VID_PLANES] = {0, 0, 0, 0};
+int           vid_plane_mdfd[MAX_VID_PLANES];
+int           vid_data_idx [MAX_VID_PLANES];
+int           vid_plane_first_frame_recvd [MAX_VID_PLANES];
+
 
 /* Vertex shader source */
 const char * vshader_src = " \
@@ -180,6 +182,22 @@ static const char * fshader_src_palpha_single_texture =
     "{\n" 
         " gl_FragColor = textureStreamIMG(sTexture, TexCoord); \n"
     "}";
+
+static const char * fshader_src_palpha_single_texture_rbswap =
+    "#ifdef GL_IMG_texture_stream2\n"
+    "#extension GL_IMG_texture_stream2 : enable\n"
+    "#endif\n"
+    "varying mediump vec2 TexCoord;\n"
+    "uniform samplerStreamIMG sTexture;\n"
+    "void main(void)\n"
+    "{\n"
+        " lowp float blueComp; \n"
+        " gl_FragColor = textureStreamIMG(sTexture, TexCoord); \n"
+        "   blueComp = gl_FragColor.b; \n"
+        "   gl_FragColor.b = gl_FragColor.r; \n"
+        "   gl_FragColor.r = blueComp; \n"
+    "}";
+
 
 /* Vertices for the video planes */
 GLfloat rect_vertices_vid[MAX_VID_PLANES][6][3] =
@@ -323,6 +341,8 @@ void usage(char *arg)
            "\t-m  y_pos of output video window  - Normalized Device Co-ordinates (-1.0 to +1.0) \n"
            "\t-n  Output video window width  - Normalized Device Co-ordinates (-1.0 to +1.0) \n"
            "\t-o  Output video window height - Normalized Device Co-ordinates (-1.0 to +1.0) \n"
+           "\t-s  swap RB in ARGB pixel format   1 - Enable <default>  \n"
+           "\t                                   0 - Disable \n"
            "\t-d  Graphics Plane config delay in milliseconds \n"
            "\t-h - print this message\n\n", arg);
 }
@@ -470,8 +490,11 @@ void * vidConfigDataThread ( void *threadarg)
         rect_vertices_vid [vid_plane_no][5][1] = ypos - height;
 
         vid_plane_mdfd[vid_plane_no] = 1;
+        vid_plane_first_frame_recvd [vid_plane_no] = 0;         
+
      } else {
         vid_data_idx[vid_plane_no] = vidCfgRecvd.buf_index;
+        vid_plane_first_frame_recvd [vid_plane_no] = 1;
 
      }
     }
@@ -485,6 +508,7 @@ static int setup_shaders( )
     /* Initialize shaders */
     ver_shader     = glCreateShader(GL_VERTEX_SHADER);
     frag_shader    = glCreateShader(GL_FRAGMENT_SHADER);
+    frag_shader_rbswap = glCreateShader(GL_FRAGMENT_SHADER);
 
     /* Attach and compile shaders */
     /* Vertex Shader */
@@ -507,7 +531,18 @@ static int setup_shaders( )
         return -1;
     }
 
+    glShaderSource(frag_shader_rbswap, 1, (const char **) &fshader_src_palpha_single_texture_rbswap, NULL);
+
+    glCompileShader(frag_shader_rbswap);
+    glGetShaderiv(frag_shader_rbswap, GL_COMPILE_STATUS, &status);
+    if (status != GL_TRUE) {
+        glGetShaderInfoLog(frag_shader_rbswap, sizeof (buf), NULL, buf);
+        printf("ERROR: Fragment shader compilation failed, info log:\n%s", buf);
+        return -1;
+    }
+
     program = glCreateProgram();
+    program_rbswap = glCreateProgram();
 
     /* Attach shader to the program */
     glAttachShader(program, ver_shader);
@@ -519,6 +554,19 @@ static int setup_shaders( )
 
     /* link the program */
     glLinkProgram(program);
+
+
+    /* Attach shader to the program */
+    glAttachShader(program_rbswap, ver_shader);
+    glAttachShader(program_rbswap, frag_shader_rbswap);
+
+    // Bind vPosition to attribute 0
+    glBindAttribLocation(program_rbswap, 0, "vPosition");
+    glBindAttribLocation(program_rbswap, 1, "inTexCoord");
+
+    /* link the program */
+    glLinkProgram(program_rbswap);
+
     return 0;
 }
 
@@ -561,9 +609,6 @@ void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no)
 
 }
 
-/* Video texture object creation */
-GLuint tex_obj_vid_created[MAX_VID_PLANES] = {0,0,0,0}; 
-
 GLuint tex_obj_vid[MAX_VID_PLANES];
 
 void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
@@ -581,6 +626,8 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
 
     } else
     {
+        glDeleteTextures(1, &tex_obj_vid[vid_plane_no]);
+
         bc_id = reinit_bcdev (vidCfg[vid_plane_no].in.fourcc, vidCfg[vid_plane_no].in.width, vidCfg[vid_plane_no].in.height, vidCfg[vid_plane_no].in.count, bc_id);
 
     }
@@ -594,14 +641,8 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
         }
      
     }
-    if (tex_obj_vid_created[vid_plane_no]) 
-    {
-        glDeleteTextures(1, &tex_obj_vid[vid_plane_no]);
 
-    }
     glGenTextures (1, &tex_obj_vid[vid_plane_no]);
-    tex_obj_vid_created[vid_plane_no] = 1;
-
     glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_vid[vid_plane_no]);
     glTexParameterf(GL_TEXTURE_STREAM_IMG, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_STREAM_IMG, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -619,6 +660,7 @@ int main(int argc, char *argv[])
     unsigned long tdiff = 0;
     int fcount = 0;
     int   profiling   = 0;
+    int swapRB_in_ARGB = 1;
 
 #ifdef FILE_RAW_VIDEO_YUV422
     int file_video = 0;
@@ -635,10 +677,13 @@ int main(int argc, char *argv[])
     unsigned long TextureBufsPa[256];
     float video_x = -0.5, video_y = 0.5, video_width = 1.0, video_height = 1.0;
 #endif
+
     int matrixLocation;
+    int matrixLocation_rbswap;
+
     unsigned long gfxconfig_delay = GFX_CONFIG_DELAY_MS;
 
-    char opts[] = "f:i:a:b:p:l:m:n:o:d:h";
+    char opts[] = "f:i:a:b:p:l:m:n:o:s:d:h";
 
     signal(SIGINT, signalHandler);
 
@@ -680,7 +725,9 @@ int main(int argc, char *argv[])
            case 'd':
                 gfxconfig_delay = (unsigned long) atoi(optarg);
                 break;
-     
+           case 's':
+                swapRB_in_ARGB = (unsigned long) atoi(optarg);
+                break;
            default:
                 usage(argv[0]);
                 return 0;
@@ -764,6 +811,18 @@ int main(int argc, char *argv[])
     memset(gfxCfg, 0, sizeof(gfxCfg_s)*MAX_GFX_PLANES);
     memset(vidCfg, 0, sizeof(videoConfig_s)*MAX_VID_PLANES);
 
+    for (i = 0; i < MAX_GFX_PLANES; i++)
+    {
+        gfx_plane_mdfd [i] = -1;
+    }
+
+    for (i = 0; i < MAX_VID_PLANES; i++)
+    {
+        vid_plane_mdfd[i] = -1;
+        vid_data_idx[i] = 0;
+        vid_plane_first_frame_recvd[i] = 0;
+    } 
+
     /* Threads for video config Planes */
     for (i=0; i < MAX_VID_PLANES; i++)
     {
@@ -796,6 +855,7 @@ int main(int argc, char *argv[])
     };
 
     matrixLocation = glGetUniformLocation(program, "matrix");
+    matrixLocation_rbswap = glGetUniformLocation(program_rbswap, "matrix");
 
     glActiveTexture(GL_TEXTURE0);
    
@@ -822,6 +882,9 @@ int main(int argc, char *argv[])
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     glUniform1i(glGetUniformLocation(program, "sTexture"), 0);
+    glUniform1i(glGetUniformLocation(program_rbswap, "sTexture"), 0);
+
+
     glUseProgram(program);
 
     gettimeofday(&tvp, NULL);
@@ -898,9 +961,12 @@ int main(int argc, char *argv[])
         /* ------------------------------------------------------------------*/
         /* Video Texturing                                                */
         /* ------------------------------------------------------------------*/
+
+        glUseProgram(program);
+
         for (i=0; i < MAX_VID_PLANES; i++)
         {
-            if (vidCfg[i].enable)
+            if (vidCfg[i].enable && vid_plane_first_frame_recvd[i])
             {
                 glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matvid[i]);
 
@@ -928,8 +994,14 @@ int main(int argc, char *argv[])
             /* Draw only if the plane configuration is done */
             if (gfxCfg[i].enable && (gfx_plane_mdfd[i] == 0))
             {
-                glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matgfx[i]);
-
+                if ((gfxCfg[i].in_g.pixel_format == BC_PIX_FMT_ARGB) && (swapRB_in_ARGB))
+                {
+                    glUseProgram(program_rbswap);
+                    glUniformMatrix4fv( matrixLocation_rbswap, 1, GL_FALSE, matgfx[i]);
+                } else {
+                    glUseProgram(program);
+                    glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matgfx[i]);
+                }
                 glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_gfx[i]);
                 glTexBindStreamIMG (bcdevid_gfx[i], 0);
 
