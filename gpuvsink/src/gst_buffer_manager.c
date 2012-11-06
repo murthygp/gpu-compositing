@@ -84,6 +84,8 @@ int    fd_video_cfg;
 videoConfig_s videoConfig;
 extern int channel_no;
 
+void          *vidStreamBufVa = NULL;
+
 static void
 gst_bcbuffer_finalize (GstBufferClassBuffer * buffer)
 {
@@ -271,7 +273,6 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
   GstBufferClassBufferPool *pool = NULL;
   GstVideoFormat format;
   gint width, height;
-  void          *vidStreamBufVa;
   unsigned long vidStreamBufPa;
   int n, i;
   if (gst_video_format_parse_caps(caps, &format, &width, &height)) {
@@ -344,7 +345,7 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
    GST_DEBUG_OBJECT (pool->elem, "requested %d buffers, got %d buffers", count,
         count);
     
-    pool->caps = caps;
+    pool->caps = gst_caps_ref(caps);
 
     /* and allocate buffers:
      */
@@ -396,6 +397,13 @@ gst_buffer_manager_dispose (GstBufferClassBufferPool * pool)
   }
 
   gst_mini_object_unref (GST_MINI_OBJECT (pool));
+ 
+  if (vidStreamBufVa) {
+      CMEM_free (vidStreamBufVa, &cmem_params); 
+      DEBUG_PRINTF ((" Freeing Video Memory - CMEM allocated \n"));
+      vidStreamBufVa = NULL;
+      close(fd_video_cfg);
+  }
 
   GST_DEBUG ("end");
 }
