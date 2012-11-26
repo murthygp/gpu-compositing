@@ -281,12 +281,12 @@ gst_render_bridge_init (GstBufferClassSink * gpuvsink, GstBufferClassSinkClass *
   gpuvsink->num_buffers = PROP_DEF_QUEUE_SIZE;
 
   /*Initialize config structure with default values*/
-  videoConfig.out.xpos   = -0.5;
-  videoConfig.out.ypos   =  0.5;
-  videoConfig.out.width  =  1.0;
-  videoConfig.out.height =  1.0;
-  channel_no = 0.0;
-  videoConfig.in.rotate = 0.0;
+  videoConfig.out.xpos   = VID_GPUVSINK_XPOS;
+  videoConfig.out.ypos   = VID_GPUVSINK_YPOS;
+  videoConfig.out.width  = VID_GPUVSINK_WIDTH;
+  videoConfig.out.height = VID_GPUVSINK_HEIGHT;
+  channel_no = VID_GPUVSINK_CHANNEL_NO;
+  videoConfig.in.rotate = VID_GPUVSINK_ROTATE;
 }
 
 static void

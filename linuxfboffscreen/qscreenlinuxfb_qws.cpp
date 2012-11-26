@@ -290,15 +290,15 @@ QLinuxFbScreenOfs::~QLinuxFbScreenOfs()
 bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
 {
     char  gfx_config_fifo[] = GFX_CONFIG_NAMED_PIPE;
-    int   gfx_plane_no = 0;  
-    float x_pos   = -1.0;
-    float y_pos   =  1.0;
-    float oheight = 2.0;
-    float owidth  = 2.0;
-    int   oblend_en = 1;
-    int   oglob_alpha_en = 1;
-    float oglobal_alpha = 0.5;
-    float orotate = 0.0;
+    int   gfx_plane_no = GFX_LINUXFBOFS_GFX_NO;  
+    float x_pos   = GFX_LINUXFBOFS_XPOS; 
+    float y_pos   = GFX_LINUXFBOFS_YPOS;
+    float oheight = GFX_LINUXFBOFS_HEIGHT;
+    float owidth  = GFX_LINUXFBOFS_WIDTH; 
+    int   oblend_en = GFX_LINUXFBOFS_GFX_BLEND_EN;
+    int   oglob_alpha_en = GFX_LINUXFBOFS_GLOB_ALPHA_EN;
+    float oglobal_alpha = GFX_LINUXFBOFS_GLOBAL_ALPHA; 
+    float orotate = GFX_LINUXFBOFS_ROTATE;
 
     unsigned long data_phy;
     gfxCfg_s gfxCfg;

@@ -58,6 +58,28 @@
 #define MAX_GFX_PLANES 4
 #define MAX_VID_PLANES 4
 
+/* Default values for linuxfbofs (Gfx)  parameters */
+#define GFX_LINUXFBOFS_GFX_NO   0      /* default value for gfx_no */
+#define GFX_LINUXFBOFS_XPOS   (-1.0)   /* x-pos */
+#define GFX_LINUXFBOFS_YPOS   (1.0)    /* y-pos */
+#define GFX_LINUXFBOFS_WIDTH  (2.0)    /* width */
+#define GFX_LINUXFBOFS_HEIGHT (2.0)    /* height */
+#define GFX_LINUXFBOFS_GFX_BLEND_EN 1  /* blend_en */
+#define GFX_LINUXFBOFS_GLOB_ALPHA_EN 1 /* glob_alpha_en */
+#define GFX_LINUXFBOFS_GLOBAL_ALPHA (0.5) /*global_alpha */
+#define GFX_LINUXFBOFS_ROTATE (0.0)    /* rotate */
+
+
+/* Default values for gpuvsink (video)  parameters */
+#define VID_GPUVSINK_XPOS   (-1.0)   /* default value for x-pos */
+#define VID_GPUVSINK_YPOS   (1.0)    /* y-pos */
+#define VID_GPUVSINK_CHANNEL_NO  0   /* default value for channel-no */
+#define VID_GPUVSINK_WIDTH  (2.0)    /* width */
+#define VID_GPUVSINK_HEIGHT (2.0)    /* height */
+#define VID_GPUVSINK_ROTATE (0.0)    /* rotate */
+
+
+
 /* GFX plane configuration delay in milliseconds to accomodate for the initial
    scene draw time by Qt */
 #define GFX_CONFIG_DELAY_MS 1000 
