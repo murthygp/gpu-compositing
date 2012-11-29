@@ -661,6 +661,7 @@ int main(int argc, char *argv[])
     int fcount = 0;
     int   profiling   = 0;
     int swapRB_in_ARGB = 1;
+    int active_planes;
 
 #ifdef FILE_RAW_VIDEO_YUV422
     int file_video = 0;
@@ -889,7 +890,22 @@ int main(int argc, char *argv[])
 
     gettimeofday(&tvp, NULL);
     while (!gQuit) {
-        glClear(GL_COLOR_BUFFER_BIT);
+        active_planes = 0; 
+        /* Check for active planes */
+        for (i=0; i < MAX_VID_PLANES; i++)
+        {
+            if (vidCfg[i].enable && vid_plane_first_frame_recvd[i])
+              active_planes++;                 
+        }
+        for (i=0; i < MAX_GFX_PLANES; i++)
+        {
+            /* mark it as active only if the plane configuration is done */
+            if (gfxCfg[i].enable && (gfx_plane_mdfd[i] == 0))
+              active_planes++;
+
+        }
+
+        if (active_planes) glClear(GL_COLOR_BUFFER_BIT);
 
 #ifdef FILE_RAW_VIDEO_YUV422
         /* ------------------------------------------------------------------*/
@@ -1037,13 +1053,15 @@ int main(int argc, char *argv[])
             } 
         }
         /*-------------------------------------------------------------------*/
-        eglSwapBuffers(dpy, surface);
+
+        if (active_planes)  eglSwapBuffers(dpy, surface);
+        else usleep (10000);
 
         if (profiling == 0)
             continue;
-        gettimeofday(&tv, NULL);
         fcount++;
         if (fcount == 1000) {
+            gettimeofday(&tv, NULL);
             tdiff = (unsigned long)(tv.tv_sec*1000 + tv.tv_usec/1000 -
                                 tvp.tv_sec*1000 - tvp.tv_usec/1000);
             printf("Frame Rate: %ld \n", (1000*1000)/tdiff);
