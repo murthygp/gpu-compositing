@@ -118,7 +118,7 @@ typedef struct
 #define MAX_VIDEO_BUFFERS_PER_CHANNEL 16
 typedef struct 
 {
-    int config_data;   /* 1 - config   0 - data */
+    int config_data;   /* 1 - config   0 - data  2 - close the named pipe */
     int buf_index;     /* if data, buffer index */
     int enable;        /* 1 - enable the video plane; 0 - disable */
 

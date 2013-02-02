@@ -386,6 +386,7 @@ fail:
 void
 gst_buffer_manager_dispose (GstBufferClassBufferPool * pool)
 {
+  int n;
   GstBufferClassBuffer *buf;
 
   g_return_if_fail (pool);
@@ -402,7 +403,19 @@ gst_buffer_manager_dispose (GstBufferClassBufferPool * pool)
       CMEM_free (vidStreamBufVa, &cmem_params); 
       DEBUG_PRINTF ((" Freeing Video Memory - CMEM allocated \n"));
       vidStreamBufVa = NULL;
+
+      videoConfig.config_data = 2;
+      n = write(fd_video_cfg, &videoConfig, sizeof(videoConfig));
+
+      if(n != sizeof(videoConfig))
+      {
+          printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
+      }
+      DEBUG_PRINTF ((" sending close command to the config fifo - %s is successful\n", video_config_fifo));
+
+      usleep (50000);
       close(fd_video_cfg);
+      usleep (100000); 
   }
 
   GST_DEBUG ("end");

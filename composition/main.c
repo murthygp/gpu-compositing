@@ -383,6 +383,8 @@ void * gfxThread ( void *threadarg)
             if (n == 0) 
             {
                 gfxCfg[gfx_plane_no].enable = 0;
+                DEBUG_PRINTF ((" closing : %d %s\n", gfx_plane_no, gfx_config_fifo));
+                close (fd_gfxplane);
                 break; 
             }
 
@@ -460,8 +462,18 @@ void * vidConfigDataThread ( void *threadarg)
         if (n == 0)
         {
             vidCfg[vid_plane_no].enable = 0;
+            close (fd_vidplane);
+            DEBUG_PRINTF ((" closing : %d %s\n", vid_plane_no, vid_config_fifo)); 
             break;
         }
+
+      if (vidCfgRecvd.config_data == 2) {
+            vidCfg[vid_plane_no].enable = 0;
+            close (fd_vidplane);
+            DEBUG_PRINTF ((" closing on receiving command from gst: %d %s\n", vid_plane_no, vid_config_fifo));
+            usleep (100000);
+            break;
+      }
 
       if (vidCfgRecvd.config_data) {
         xpos   = vidCfgRecvd.out.xpos;
@@ -584,7 +596,10 @@ void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no)
     {
         /* open a device and initialize with texture parameters */
         bc_id = init_bcdev (gfxCfg[gfx_plane_no].in_g.pixel_format,gfxCfg[gfx_plane_no].in_g.width, gfxCfg[gfx_plane_no].in_g.height, 1);
-        if ( bc_id < 0) exit (0);
+        if ( bc_id < 0) {
+            printf (" exiting due to failure in bc_id check for gfx \n");
+            exit (0);
+        }
 
     } else 
     {
@@ -596,7 +611,8 @@ void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no)
     /* set the gfx plane buffer address as the texture address */
     if ( modify_bufAddr (bc_id, 0, gfxCfg[gfx_plane_no].in_g.data_ph_addr) < 0)
     {
-            exit(0);
+        printf (" exiting due to failure in modify_bufAddr for gfx plane \n");
+        exit(0);
     }
     glGenTextures(1, &tex_obj_gfx[gfx_plane_no]);
     glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_gfx[gfx_plane_no]);
@@ -622,7 +638,10 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
     if (bc_id < 0)
     {
         bc_id = init_bcdev (vidCfg[vid_plane_no].in.fourcc, vidCfg[vid_plane_no].in.width, vidCfg[vid_plane_no].in.height, vidCfg[vid_plane_no].in.count);
-        if ( bc_id < 0) exit (0);
+        if ( bc_id < 0) {
+           printf (" exiting due to bc_id check failure for vid \n");
+           exit (0);
+        }
 
     } else
     {
@@ -637,7 +656,8 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
     {
         if ( modify_bufAddr (bc_id, i, vidCfg[vid_plane_no].in.phyaddr[i]) < 0)
         {
-            exit(0);
+           printf (" exiting due to failure in modify buf addr for video \n");
+           exit(0);
         }
      
     }
@@ -801,7 +821,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
         yuv_ptr = (char *)vidStreamBufVa;
-        DEBUG_PRINTF((" Loading YUV422 data from file ......"));fflush(stdout);
+        DEBUG_PRINTF((" Loading YUV422 data from file ......"));
         fread( yuv_ptr ,1, (iwidth*iheight*2*MAX_TEX_BUFS), fin);
         DEBUG_PRINTF((" Finished ......\n"));
         fclose (fin);
@@ -869,7 +889,8 @@ int main(int argc, char *argv[])
         {
             if ( modify_bufAddr (bcdevid_file_vid, i, TextureBufsPa[i]) < 0)
             {
-                exit(0);
+               printf (" exiting due to modify_bufAddr failure file video \n");
+               exit(0);
             }
         }
 
