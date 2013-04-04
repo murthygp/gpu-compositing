@@ -69,6 +69,10 @@ extern videoConfig_s videoConfig;
 
 int channel_no; 
 
+GstBufferClassBuffer *bcbuf_prev1 = NULL;
+GstBufferClassBuffer *bcbuf_prev2 = NULL;
+GstBufferClassBuffer *bcbuf_prev3 = NULL;
+
 /*Used for unreferencing buffers for deferred rendering architecture */
 GstBufferClassBuffer *bcbuf_queue[MAX_QUEUE]= {NULL, NULL, NULL};
 
@@ -403,6 +407,13 @@ gst_render_bridge_change_state (GstElement * element, GstStateChange transition)
       if (gpuvsink->pool) {
         gst_buffer_manager_dispose (gpuvsink->pool);
         gpuvsink->pool = NULL;
+
+        if (bcbuf_prev3 != NULL)
+          gst_buffer_unref (bcbuf_prev3);
+        if (bcbuf_prev2 != NULL)
+          gst_buffer_unref (bcbuf_prev2);
+        if (bcbuf_prev1 != NULL)
+          gst_buffer_unref (bcbuf_prev1);
       }
       break;
     }
@@ -544,8 +555,14 @@ gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
   {
       printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
   }
-  
-  gst_buffer_unref(bcbuf);
+ 
+  /* delay the buffer free up by two frames to account for the SGX deferred rendering archtecture */
+  if (bcbuf_prev3 != NULL)
+    gst_buffer_unref (bcbuf_prev3);
+  bcbuf_prev3 = bcbuf_prev2;
+  bcbuf_prev2 = bcbuf_prev1;
+  bcbuf_prev1 = bcbuf; 
+//  gst_buffer_unref(bcbuf);
 
   /* note: it would be nice to know when the driver is done with the buffer..
    * but for now we don't keep an extra ref
