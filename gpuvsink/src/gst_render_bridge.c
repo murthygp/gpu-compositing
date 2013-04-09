@@ -413,7 +413,10 @@ gst_render_bridge_change_state (GstElement * element, GstStateChange transition)
         if (bcbuf_prev2 != NULL)
           gst_buffer_unref (bcbuf_prev2);
         if (bcbuf_prev1 != NULL)
-          gst_buffer_unref (bcbuf_prev1);
+          gst_buffer_unref (bcbuf_prev1); 
+        bcbuf_prev3 = NULL;
+        bcbuf_prev2 = NULL;
+        bcbuf_prev1 = NULL;
       }
       break;
     }
