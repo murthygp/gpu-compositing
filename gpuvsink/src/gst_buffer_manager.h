@@ -121,6 +121,7 @@ struct _GstBufferClassBufferPool
   guint32 num_buffers;
   GstBufferClassBuffer **buffers;
   GAsyncQueue *avail_buffers;   /* pool of available buffers */
+  void *vidStreamBufVa;
 
 };
 

@@ -482,7 +482,7 @@ void * vidConfigDataThread ( void *threadarg)
         height = vidCfgRecvd.out.height;
 
         vidCfg[vid_plane_no] = vidCfgRecvd;
-
+ 
         rect_vertices_vid [vid_plane_no][0][0] = xpos;
         rect_vertices_vid [vid_plane_no][0][1] = ypos;
 
@@ -995,15 +995,15 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* ------------------------------------------------------------------*/
-        /* Video Texturing                                                */
-        /* ------------------------------------------------------------------*/
+        /* -----------------------------------------------------------------------------*/
+        /* Video Texturing  for overlayongfx=0, i.e., gfx planes on top of video planes */
+        /* -----------------------------------------------------------------------------*/
 
         glUseProgram(program);
 
         for (i=0; i < MAX_VID_PLANES; i++)
         {
-            if (vidCfg[i].enable && vid_plane_first_frame_recvd[i])
+            if (vidCfg[i].enable && vid_plane_first_frame_recvd[i] && !vidCfg[i].overlayongfx)
             {
                 glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matvid[i]);
 
@@ -1073,6 +1073,34 @@ int main(int argc, char *argv[])
                 }
             } 
         }
+
+        /* -----------------------------------------------------------------------------*/
+        /* Video Texturing  for overlayongfx=1, i.e., video planes on top of gfx planes */
+        /* -----------------------------------------------------------------------------*/
+
+        glUseProgram(program);
+
+        for (i=0; i < MAX_VID_PLANES; i++)
+        {
+            if (vidCfg[i].enable && vid_plane_first_frame_recvd[i] && vidCfg[i].overlayongfx)
+            {
+                glUniformMatrix4fv( matrixLocation, 1, GL_FALSE, matvid[i]);
+
+                glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_vid[i]);
+                glTexBindStreamIMG(bcdevid_vid[i], vid_data_idx[i]);
+
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0,
+                                      rect_vertices_vid[i]);
+                glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0,
+                                      rect_texcoord);
+                glEnableVertexAttribArray(0);
+                glEnableVertexAttribArray(1);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+                glDisableVertexAttribArray (0);
+                glDisableVertexAttribArray (1);
+            }
+        }
+
         /*-------------------------------------------------------------------*/
 
         if (active_planes)  eglSwapBuffers(dpy, surface);

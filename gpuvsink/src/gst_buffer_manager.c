@@ -60,10 +60,10 @@
 #include "gst_render_bridge.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <cmem.h>
 #include "../../gpucomp.h"
 
-char video_config_fifo[] = VIDEO_CONFIG_AND_DATA_FIFO_NAME;
 
 GST_DEBUG_CATEGORY_EXTERN (gpuvsink_debug);
 #define GST_CAT_DEFAULT gpuvsink_debug
@@ -78,13 +78,8 @@ static CMEM_AllocParams cmem_params = { CMEM_POOL, CMEM_CACHED, 4096 };
  * GstBufferClassBuffer:
  */
 static GstBufferClass *buffer_parent_class = NULL;
-int    fd_video_cfg;
 
-/* video configuration and data structure, interface from this module to composition using named pipe */
-videoConfig_s videoConfig;
-extern int channel_no;
 
-void          *vidStreamBufVa = NULL;
 
 static void
 gst_bcbuffer_finalize (GstBufferClassBuffer * buffer)
@@ -274,7 +269,11 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
   GstVideoFormat format;
   gint width, height;
   unsigned long vidStreamBufPa;
+  void *vidStreamBufVa;
   int n, i;
+
+  GstBufferClassSink *gpuvsink = GST_BCSINK (elem);
+
   if (gst_video_format_parse_caps(caps, &format, &width, &height)) {
 
   /* The buffers are allocated from CMEM as the gpu composition requires contiguous memory */
@@ -305,31 +304,35 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
   videoConfig.in.count   = count;
   videoConfig.in.height  = height;
   videoConfig.in.width   = width;
+  if(format == GST_VIDEO_FORMAT_YUY2) {
+    videoConfig.in.fourcc  = GST_MAKE_FOURCC ('Y', 'U', 'Y', 'V');
+  }
+  else
   videoConfig.in.fourcc  = gst_video_format_to_fourcc (format);
 
   /* Send the video configuration via named pipe to the composition module */
-  video_config_fifo[strlen(video_config_fifo)-1] = '0' + channel_no;
+  gpuvsink->video_config_fifo[strlen(gpuvsink->video_config_fifo)-1] = '0' +  gpuvsink->channel_no;
 
-  DEBUG_PRINTF ((" gst_buffer_manager_new: video buffers allocation successfull for channel_no: %d \n", channel_no));
-  DEBUG_PRINTF ((" Opening the video config fifo - %s\n", video_config_fifo));
+  DEBUG_PRINTF ((" gst_buffer_manager_new: video buffers allocation successfull for channel_no: %d \n",  gpuvsink->channel_no));
+  DEBUG_PRINTF ((" Opening the video config fifo - %s\n", gpuvsink->video_config_fifo));
 
-  fd_video_cfg = open(video_config_fifo, O_WRONLY);
-  if(fd_video_cfg < 0)
+  gpuvsink->fd_video_cfg = open(gpuvsink->video_config_fifo, O_WRONLY);
+  if(gpuvsink->fd_video_cfg < 0)
   {
-    printf (" Failed to open fd_video_cfg FIFO - fd: %d\n", fd_video_cfg);
+    printf (" Failed to open fd_video_cfg FIFO - fd: %d\n", gpuvsink->fd_video_cfg);
     exit(0);
   }
 
-  DEBUG_PRINTF ((" writing to the config fifo - %s \n", video_config_fifo));
+  DEBUG_PRINTF ((" writing to the config fifo - %s \n", gpuvsink->video_config_fifo));
 
-  n = write(fd_video_cfg, &videoConfig, sizeof(videoConfig));
+  n = write(gpuvsink->fd_video_cfg, &videoConfig, sizeof(videoConfig));
 
   if(n != sizeof(videoConfig))
   {
     printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
   }
 
-  DEBUG_PRINTF ((" writing to the config fifo - %s is successful\n", video_config_fifo));
+  DEBUG_PRINTF ((" writing to the config fifo - %s is successful\n", gpuvsink->video_config_fifo));
 
   /* construct bufferpool */
   pool = (GstBufferClassBufferPool *)
@@ -339,6 +342,7 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
    pool->fd = -1;
    pool->elem = elem;
    pool->num_buffers = count;
+   pool->vidStreamBufVa = vidStreamBufVa;
 
 
    GST_DEBUG_OBJECT (pool->elem, "orig caps: %" GST_PTR_FORMAT, caps);
@@ -388,7 +392,7 @@ gst_buffer_manager_dispose (GstBufferClassBufferPool * pool)
 {
   int n;
   GstBufferClassBuffer *buf;
-
+  GstBufferClassSink *gpuvsink = GST_BCSINK (pool->elem);
   g_return_if_fail (pool);
 
   pool->running = FALSE;
@@ -399,22 +403,22 @@ gst_buffer_manager_dispose (GstBufferClassBufferPool * pool)
 
   gst_mini_object_unref (GST_MINI_OBJECT (pool));
  
-  if (vidStreamBufVa) {
-      CMEM_free (vidStreamBufVa, &cmem_params); 
+  if (pool->vidStreamBufVa) {
+      CMEM_free (pool->vidStreamBufVa, &cmem_params); 
       DEBUG_PRINTF ((" Freeing Video Memory - CMEM allocated \n"));
-      vidStreamBufVa = NULL;
+      pool->vidStreamBufVa = NULL;
 
-      videoConfig.config_data = 2;
-      n = write(fd_video_cfg, &videoConfig, sizeof(videoConfig));
+      gpuvsink->videoConfig.config_data = 2;
+      n = write(gpuvsink->fd_video_cfg, &gpuvsink->videoConfig, sizeof(gpuvsink->videoConfig));
 
-      if(n != sizeof(videoConfig))
+      if(n != sizeof(gpuvsink->videoConfig))
       {
           printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
       }
       DEBUG_PRINTF ((" sending close command to the config fifo - %s is successful\n", video_config_fifo));
 
       usleep (50000);
-      close(fd_video_cfg);
+      close(gpuvsink->fd_video_cfg);
       usleep (100000); 
   }
 
@@ -457,7 +461,7 @@ gst_buffer_manager_get (GstBufferClassBufferPool * pool)
 void
 gst_bcbuffer_flush (GstBufferClassBuffer * buffer)
 {
-  GstBufferClassBufferPool *pool = buffer->pool;
+//  GstBufferClassBufferPool *pool = buffer->pool;
 
 // DEBUG_PRINTF ((" gst_bcbuffer_flush not implemented \n"));
   

@@ -89,6 +89,22 @@ struct _GstBufferClassSink
   GstBufferClassBufferPool *pool;
 
   int fd;
+  char video_config_fifo[100];
+  videoConfig_s videoConfig;
+  int    fd_video_cfg;
+  int channel_no;
+/*  GstBufferClassBuffer *bcbuf_prev1;
+  GstBufferClassBuffer *bcbuf_prev2;
+  GstBufferClassBuffer *bcbuf_prev3;
+  GstBufferClassBuffer *bcbuf_prev4;
+  GstBufferClassBuffer *bcbuf_prev5; */
+
+  GstBuffer *bcbuf_prev1;
+  GstBuffer *bcbuf_prev2;
+  GstBuffer *bcbuf_prev3;
+  GstBuffer *bcbuf_prev4;
+  GstBuffer *bcbuf_prev5;
+
 };
 
 struct _GstBufferClassSinkClass

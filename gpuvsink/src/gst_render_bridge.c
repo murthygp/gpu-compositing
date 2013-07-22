@@ -60,26 +60,11 @@
 
 #include "../../gpucomp.h"
 
-char video_data_fifo[] = VIDEODATA_FIFO_NAME;
-int fd_viddata_fifo;
-int first_time = 1;
-videoConfig_s videoConfig;
-extern int    fd_video_cfg;
-extern videoConfig_s videoConfig;
-
-int channel_no; 
-
-GstBufferClassBuffer *bcbuf_prev1 = NULL;
-GstBufferClassBuffer *bcbuf_prev2 = NULL;
-GstBufferClassBuffer *bcbuf_prev3 = NULL;
-
-/*Used for unreferencing buffers for deferred rendering architecture */
-GstBufferClassBuffer *bcbuf_queue[MAX_QUEUE]= {NULL, NULL, NULL};
 
 static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV("{I420, YV12, NV12, UYVY, YUYV}"))
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV("{I420, YV12, NV12, UYVY, YUYV, YUY2}"))
     );
 
 GST_DEBUG_CATEGORY (gpuvsink_debug);
@@ -98,7 +83,7 @@ enum
   PROP_WIDTH,
   PROP_HEIGHT,
   PROP_ROTATE,
-
+  PROP_OVERLAYONGFX
 };
 
 /* Signals */
@@ -189,38 +174,44 @@ gst_render_bridge_class_init (GstBufferClassSinkClass * klass)
       g_param_spec_float ("x-pos",
           "Display config parameters",
           "Specifies normalized device output x-cordinate for the video"
-          "on the display", -1, 1, 0, G_PARAM_READWRITE));
+          "on the display", -1, 1, 0, G_PARAM_WRITABLE));
 
   g_object_class_install_property (gobject_class, PROP_YPOS,
       g_param_spec_float ("y-pos",
           "Display config parameters",
           "Specifies normalized device output y-cordinate for the video"
-          "on the display", -1, 1, 1, G_PARAM_READWRITE));
+          "on the display", -1, 1, 1, G_PARAM_WRITABLE));
 
   g_object_class_install_property (gobject_class, PROP_WIDTH,
       g_param_spec_float ("width",
           "Display config parameters",
           "Specifies the normalized device output width for the video"
-          "on the display", 0, 2, 0, G_PARAM_READWRITE));
+          "on the display", 0, 2, 0, G_PARAM_WRITABLE));
 
   g_object_class_install_property (gobject_class, PROP_HEIGHT,
       g_param_spec_float ("height",
           "Display config parameters",
           "Specifies the normalized output height for the video"
-          "on the display", 0, 2, 0, G_PARAM_READWRITE));
+          "on the display", 0, 2, 0, G_PARAM_WRITABLE));
 
 
   g_object_class_install_property (gobject_class, PROP_CHANNEL_NO,
       g_param_spec_uint ("channel-no",
           "Video channel number",
           "Specifies the video channel number"
-          "on the display", 0, 4, 0, G_PARAM_READWRITE));
+          "on the display", 0, 4, 0, G_PARAM_WRITABLE));
 
  g_object_class_install_property (gobject_class, PROP_ROTATE,
       g_param_spec_float ("rotate",
           "Display config parameters",
           "Specifies the rotation in degrees"
-          "on the display", -180, 180, 0, G_PARAM_READWRITE));
+          "on the display", -180, 180, 0, G_PARAM_WRITABLE));
+
+g_object_class_install_property (gobject_class, PROP_OVERLAYONGFX,
+      g_param_spec_uint ("overlayongfx",
+          "Overlay video channel on top of gfx",
+          "Specifies the video channel priority over gfx 0 - gfx over video  1 - video over gfx  "
+          "on the display", 0, 1, 0, G_PARAM_WRITABLE));
 
 
   /**
@@ -285,12 +276,19 @@ gst_render_bridge_init (GstBufferClassSink * gpuvsink, GstBufferClassSinkClass *
   gpuvsink->num_buffers = PROP_DEF_QUEUE_SIZE;
 
   /*Initialize config structure with default values*/
-  videoConfig.out.xpos   = VID_GPUVSINK_XPOS;
-  videoConfig.out.ypos   = VID_GPUVSINK_YPOS;
-  videoConfig.out.width  = VID_GPUVSINK_WIDTH;
-  videoConfig.out.height = VID_GPUVSINK_HEIGHT;
-  channel_no = VID_GPUVSINK_CHANNEL_NO;
-  videoConfig.in.rotate = VID_GPUVSINK_ROTATE;
+  gpuvsink->videoConfig.out.xpos   = VID_GPUVSINK_XPOS;
+  gpuvsink->videoConfig.out.ypos   = VID_GPUVSINK_YPOS;
+  gpuvsink->videoConfig.out.width  = VID_GPUVSINK_WIDTH;
+  gpuvsink->videoConfig.out.height = VID_GPUVSINK_HEIGHT;
+  gpuvsink->channel_no = VID_GPUVSINK_CHANNEL_NO;
+  gpuvsink->videoConfig.overlayongfx = VID_OVERLAYONGFX;
+  gpuvsink->videoConfig.in.rotate = VID_GPUVSINK_ROTATE;
+  strcpy(gpuvsink->video_config_fifo,VIDEO_CONFIG_AND_DATA_FIFO_NAME);
+  gpuvsink->bcbuf_prev1 = NULL;
+  gpuvsink->bcbuf_prev2 = NULL;
+  gpuvsink->bcbuf_prev3 = NULL;
+  gpuvsink->bcbuf_prev4 = NULL;
+  gpuvsink->bcbuf_prev5 = NULL;  
 }
 
 static void
@@ -323,31 +321,35 @@ gst_render_bridge_set_property (GObject * object,
       break;
 
     case PROP_CHANNEL_NO:
-         channel_no = g_value_get_uint (value);
-         if (channel_no < 0 || channel_no > (MAX_GFX_PLANES-1)) {
-             printf (" Invalid Channel Number: %d   <Valid Range: 0 to MAX_GFX_PLANES> \n", channel_no);
+         gpuvsink->channel_no = g_value_get_uint (value);
+         if (gpuvsink->channel_no < 0 || gpuvsink->channel_no > (MAX_GFX_PLANES-1)) {
+             printf (" Invalid Channel Number: %d   <Valid Range: 0 to MAX_GFX_PLANES> \n", gpuvsink->channel_no);
              exit (0);
          }
          break;
 
     case PROP_XPOS:
-	videoConfig.out.xpos = g_value_get_float (value);
+	gpuvsink->videoConfig.out.xpos = g_value_get_float (value);
 	break;
 
+    case  PROP_OVERLAYONGFX:
+        gpuvsink->videoConfig.overlayongfx = g_value_get_uint (value);
+        break;
+
     case PROP_YPOS:
-	videoConfig.out.ypos = g_value_get_float (value);
+	gpuvsink->videoConfig.out.ypos = g_value_get_float (value);
 	break;
 
     case PROP_WIDTH:
-	videoConfig.out.width = g_value_get_float (value);
+	gpuvsink->videoConfig.out.width = g_value_get_float (value);
 	break;
 
     case PROP_HEIGHT:
-	videoConfig.out.height = g_value_get_float (value);
+	gpuvsink->videoConfig.out.height = g_value_get_float (value);
 	break;
 
     case PROP_ROTATE:
-        videoConfig.in.rotate = g_value_get_float (value);
+    gpuvsink->videoConfig.in.rotate = g_value_get_float (value);
         break;
 
 
@@ -408,15 +410,15 @@ gst_render_bridge_change_state (GstElement * element, GstStateChange transition)
         gst_buffer_manager_dispose (gpuvsink->pool);
         gpuvsink->pool = NULL;
 
-        if (bcbuf_prev3 != NULL)
-          gst_buffer_unref (bcbuf_prev3);
-        if (bcbuf_prev2 != NULL)
-          gst_buffer_unref (bcbuf_prev2);
-        if (bcbuf_prev1 != NULL)
-          gst_buffer_unref (bcbuf_prev1); 
-        bcbuf_prev3 = NULL;
-        bcbuf_prev2 = NULL;
-        bcbuf_prev1 = NULL;
+        if (gpuvsink->bcbuf_prev3 != NULL)
+          gst_buffer_unref (gpuvsink->bcbuf_prev3);
+        if (gpuvsink->bcbuf_prev2 != NULL)
+          gst_buffer_unref (gpuvsink->bcbuf_prev2);
+        if (gpuvsink->bcbuf_prev1 != NULL)
+          gst_buffer_unref (gpuvsink->bcbuf_prev1); 
+        gpuvsink->bcbuf_prev3 = NULL;
+        gpuvsink->bcbuf_prev2 = NULL;
+        gpuvsink->bcbuf_prev1 = NULL;
       }
       break;
     }
@@ -461,7 +463,7 @@ gst_render_bridge_set_caps (GstBaseSink * bsink, GstCaps * caps)
       "constructing bufferpool with caps: %" GST_PTR_FORMAT, caps);
 
   gpuvsink->pool =
-      gst_buffer_manager_new (GST_ELEMENT (gpuvsink), videoConfig,
+      gst_buffer_manager_new (GST_ELEMENT (gpuvsink), gpuvsink->videoConfig,
       gpuvsink->num_buffers, caps);
 
   if (!gpuvsink->pool) {
@@ -549,22 +551,22 @@ gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
   //g_signal_emit (gpuvsink, signals[SIG_RENDER], 0, bcbuf->index);
   gst_buffer_ref(bcbuf);
 
-  videoConfig.config_data = 0;
-  videoConfig.buf_index = bcbuf->index;
+  gpuvsink->videoConfig.config_data = 0;
+  gpuvsink->videoConfig.buf_index = bcbuf->index;
 
-   n = write(fd_video_cfg, &videoConfig, sizeof(videoConfig));
+   n = write(gpuvsink->fd_video_cfg, &gpuvsink->videoConfig, sizeof(gpuvsink->videoConfig));
 
-  if(n != sizeof(videoConfig))
+  if(n != sizeof(gpuvsink->videoConfig))
   {
       printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
   }
  
   /* delay the buffer free up by two frames to account for the SGX deferred rendering archtecture */
-  if (bcbuf_prev3 != NULL)
-    gst_buffer_unref (bcbuf_prev3);
-  bcbuf_prev3 = bcbuf_prev2;
-  bcbuf_prev2 = bcbuf_prev1;
-  bcbuf_prev1 = bcbuf; 
+  if (gpuvsink->bcbuf_prev3 != NULL)
+    gst_buffer_unref (gpuvsink->bcbuf_prev3);
+  gpuvsink->bcbuf_prev3 = gpuvsink->bcbuf_prev2;
+  gpuvsink->bcbuf_prev2 = gpuvsink->bcbuf_prev1;
+  gpuvsink->bcbuf_prev1 = bcbuf; 
 //  gst_buffer_unref(bcbuf);
 
   /* note: it would be nice to know when the driver is done with the buffer..

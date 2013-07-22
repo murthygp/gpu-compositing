@@ -77,6 +77,7 @@
 #define VID_GPUVSINK_WIDTH  (2.0)    /* width */
 #define VID_GPUVSINK_HEIGHT (2.0)    /* height */
 #define VID_GPUVSINK_ROTATE (0.0)    /* rotate */
+#define VID_OVERLAYONGFX     0       /* disable video overlay on gfx */
 
 
 
@@ -121,6 +122,7 @@ typedef struct
     int config_data;   /* 1 - config   0 - data  2 - close the named pipe */
     int buf_index;     /* if data, buffer index */
     int enable;        /* 1 - enable the video plane; 0 - disable */
+    int overlayongfx;  /* 0 - gfx on video; 1 - video on gfx */
 
     /* Video plane config structure */
     struct in {
