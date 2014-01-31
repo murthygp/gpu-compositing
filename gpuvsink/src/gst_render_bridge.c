@@ -64,7 +64,7 @@
 static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV("{I420, YV12, NV12, UYVY, YUYV, YUY2}"))
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV("{I420, YV12, NV12, UYVY, YUYV}"))
     );
 
 GST_DEBUG_CATEGORY (gpuvsink_debug);
@@ -83,7 +83,11 @@ enum
   PROP_WIDTH,
   PROP_HEIGHT,
   PROP_ROTATE,
-  PROP_OVERLAYONGFX
+  PROP_OVERLAYONGFX,
+  PROP_CROP_X,
+  PROP_CROP_Y,
+  PROP_CROP_WIDTH,
+  PROP_CROP_HEIGHT
 };
 
 /* Signals */
@@ -213,6 +217,30 @@ g_object_class_install_property (gobject_class, PROP_OVERLAYONGFX,
           "Specifies the video channel priority over gfx 0 - gfx over video  1 - video over gfx  "
           "on the display", 0, 1, 0, G_PARAM_WRITABLE));
 
+g_object_class_install_property (gobject_class, PROP_CROP_X,
+      g_param_spec_uint ("crop_x",
+          "cropping x co-ordinate",
+          "Specifies the starting x co-ordinate for video frame cropping in samples"
+          "on the display", 0, 4096, 0, G_PARAM_WRITABLE));
+
+g_object_class_install_property (gobject_class, PROP_CROP_Y,
+      g_param_spec_uint ("crop_y",
+          "cropping y co-ordinate",
+          "Specifies the starting y co-ordinate for video frame cropping in samples"
+          "on the display", 0, 4096, 0, G_PARAM_WRITABLE));
+
+
+g_object_class_install_property (gobject_class, PROP_CROP_WIDTH,
+      g_param_spec_uint ("crop_w",
+          "cropping width",
+          "Specifies the cropping width in samples"
+          "on the display", 0, 4096, 0, G_PARAM_WRITABLE));
+
+g_object_class_install_property (gobject_class, PROP_CROP_HEIGHT,
+      g_param_spec_uint ("crop_h",
+          "cropping height",
+          "Specifies the cropping height in samples"
+          "on the display", 0, 4096, 0, G_PARAM_WRITABLE));
 
   /**
    * GstBufferClassSink:queue-size
@@ -288,7 +316,11 @@ gst_render_bridge_init (GstBufferClassSink * gpuvsink, GstBufferClassSinkClass *
   gpuvsink->bcbuf_prev2 = NULL;
   gpuvsink->bcbuf_prev3 = NULL;
   gpuvsink->bcbuf_prev4 = NULL;
-  gpuvsink->bcbuf_prev5 = NULL;  
+  gpuvsink->bcbuf_prev5 = NULL;
+  gpuvsink->videoConfig.in.crop_x = 0;
+  gpuvsink->videoConfig.in.crop_y = 0;
+  gpuvsink->videoConfig.in.crop_width = 0;
+  gpuvsink->videoConfig.in.crop_height = 0;
 }
 
 static void
@@ -349,9 +381,24 @@ gst_render_bridge_set_property (GObject * object,
 	break;
 
     case PROP_ROTATE:
-    gpuvsink->videoConfig.in.rotate = g_value_get_float (value);
+        gpuvsink->videoConfig.in.rotate = g_value_get_float (value);
         break;
 
+    case  PROP_CROP_X:
+        gpuvsink->videoConfig.in.crop_x = g_value_get_uint (value);
+        break;
+
+    case  PROP_CROP_Y:
+        gpuvsink->videoConfig.in.crop_y = g_value_get_uint (value);
+        break;
+
+    case  PROP_CROP_WIDTH:
+        gpuvsink->videoConfig.in.crop_width = g_value_get_uint (value);
+        break;
+
+    case  PROP_CROP_HEIGHT:
+        gpuvsink->videoConfig.in.crop_height = g_value_get_uint (value);
+        break;
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -410,12 +457,19 @@ gst_render_bridge_change_state (GstElement * element, GstStateChange transition)
         gst_buffer_manager_dispose (gpuvsink->pool);
         gpuvsink->pool = NULL;
 
+        if (gpuvsink->bcbuf_prev5 != NULL)
+          gst_buffer_unref (gpuvsink->bcbuf_prev5);
+        if (gpuvsink->bcbuf_prev4 != NULL)
+          gst_buffer_unref (gpuvsink->bcbuf_prev4);
         if (gpuvsink->bcbuf_prev3 != NULL)
           gst_buffer_unref (gpuvsink->bcbuf_prev3);
         if (gpuvsink->bcbuf_prev2 != NULL)
           gst_buffer_unref (gpuvsink->bcbuf_prev2);
         if (gpuvsink->bcbuf_prev1 != NULL)
           gst_buffer_unref (gpuvsink->bcbuf_prev1); 
+
+        gpuvsink->bcbuf_prev5 = NULL;
+        gpuvsink->bcbuf_prev4 = NULL;
         gpuvsink->bcbuf_prev3 = NULL;
         gpuvsink->bcbuf_prev2 = NULL;
         gpuvsink->bcbuf_prev1 = NULL;
@@ -497,6 +551,8 @@ gst_render_bridge_buffer_alloc (GstBaseSink * bsink, guint64 offset, guint size,
 
   *buf = GST_BUFFER (gst_buffer_manager_get (gpuvsink->pool));
 
+ // printf ("gpuvsink: allocated a buffer 0x%x \n", GST_BUFFER_DATA(*buf));
+
   if (G_LIKELY (buf)) {
     GST_DEBUG_OBJECT (gpuvsink, "allocated buffer: %p", *buf);
     return GST_FLOW_OK;
@@ -562,8 +618,10 @@ gst_render_bridge_show_frame (GstBaseSink * bsink, GstBuffer * buf)
   }
  
   /* delay the buffer free up by two frames to account for the SGX deferred rendering archtecture */
-  if (gpuvsink->bcbuf_prev3 != NULL)
-    gst_buffer_unref (gpuvsink->bcbuf_prev3);
+  if (gpuvsink->bcbuf_prev5 != NULL)
+    gst_buffer_unref (gpuvsink->bcbuf_prev5);
+  gpuvsink->bcbuf_prev5 = gpuvsink->bcbuf_prev4;
+  gpuvsink->bcbuf_prev4 = gpuvsink->bcbuf_prev3;
   gpuvsink->bcbuf_prev3 = gpuvsink->bcbuf_prev2;
   gpuvsink->bcbuf_prev2 = gpuvsink->bcbuf_prev1;
   gpuvsink->bcbuf_prev1 = bcbuf; 

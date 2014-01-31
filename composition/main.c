@@ -327,6 +327,9 @@ GLfloat rect_texcoord[6][2] =
 
 };
 
+GLfloat rect_tex_gfx[MAX_GFX_PLANES][6][2];
+GLfloat rect_tex_vid[MAX_VID_PLANES][6][2];
+
 void usage(char *arg)
 {
     printf("Usage:\n"
@@ -588,6 +591,7 @@ GLuint tex_obj_gfx[MAX_GFX_PLANES];
 void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no) 
 {
     int bc_id;
+    float crop_x_n, crop_w_n, crop_y_n, crop_h_n;
 
     bc_id = *bc_id_p;
 
@@ -621,6 +625,30 @@ void recreate_gfx_texture (int * bc_id_p, int gfx_plane_no)
 
     *bc_id_p = bc_id;   /* store the device id */
 
+    crop_x_n = (float) gfxCfg[gfx_plane_no].in_g.crop_x/gfxCfg[gfx_plane_no].in_g.width;
+    crop_w_n = (float) gfxCfg[gfx_plane_no].in_g.crop_width/gfxCfg[gfx_plane_no].in_g.width;
+    crop_y_n = (float) gfxCfg[gfx_plane_no].in_g.crop_y/gfxCfg[gfx_plane_no].in_g.height;
+    crop_h_n = (float) gfxCfg[gfx_plane_no].in_g.crop_height/gfxCfg[gfx_plane_no].in_g.height;
+
+    rect_tex_gfx[gfx_plane_no][0][0] = crop_x_n;
+    rect_tex_gfx[gfx_plane_no][0][1] = crop_y_n;
+
+    rect_tex_gfx[gfx_plane_no][1][0] = crop_x_n;
+    rect_tex_gfx[gfx_plane_no][1][1] = crop_y_n + crop_h_n;
+
+    rect_tex_gfx[gfx_plane_no][2][0] = crop_x_n + crop_w_n;
+    rect_tex_gfx[gfx_plane_no][2][1] = crop_y_n;
+
+   
+    rect_tex_gfx[gfx_plane_no][3][0] = crop_x_n + crop_w_n;
+    rect_tex_gfx[gfx_plane_no][3][1] = crop_y_n;
+
+    rect_tex_gfx[gfx_plane_no][4][0] = crop_x_n;
+    rect_tex_gfx[gfx_plane_no][4][1] = crop_y_n + crop_h_n;
+
+    rect_tex_gfx[gfx_plane_no][5][0] = crop_x_n + crop_w_n;
+    rect_tex_gfx[gfx_plane_no][5][1] = crop_y_n + crop_h_n;
+
     DEBUG_PRINTF ((" bc_id: %d  gfx_plane_no: %d  data_ph_addr: %lx \n", bc_id, gfx_plane_no, gfxCfg[gfx_plane_no].in_g.data_ph_addr));
 
 }
@@ -630,6 +658,7 @@ GLuint tex_obj_vid[MAX_VID_PLANES];
 void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
 {
     int bc_id, i;
+    float crop_x_n, crop_w_n, crop_y_n, crop_h_n;
 
     bc_id = *bc_id_p;
 
@@ -661,6 +690,30 @@ void recreate_vid_texture (int * bc_id_p, int vid_plane_no)
         }
      
     }
+
+    crop_x_n = (float) vidCfg[vid_plane_no].in.crop_x/vidCfg[vid_plane_no].in.width;
+    crop_w_n = (float) vidCfg[vid_plane_no].in.crop_width/vidCfg[vid_plane_no].in.width;
+    crop_y_n = (float) vidCfg[vid_plane_no].in.crop_y/vidCfg[vid_plane_no].in.height;
+    crop_h_n = (float) vidCfg[vid_plane_no].in.crop_height/vidCfg[vid_plane_no].in.height;
+
+    rect_tex_vid[vid_plane_no][0][0] = crop_x_n;
+    rect_tex_vid[vid_plane_no][0][1] = crop_y_n;
+
+    rect_tex_vid[vid_plane_no][1][0] = crop_x_n;
+    rect_tex_vid[vid_plane_no][1][1] = crop_y_n + crop_h_n;
+
+    rect_tex_vid[vid_plane_no][2][0] = crop_x_n + crop_w_n;
+    rect_tex_vid[vid_plane_no][2][1] = crop_y_n;
+
+
+    rect_tex_vid[vid_plane_no][3][0] = crop_x_n + crop_w_n;
+    rect_tex_vid[vid_plane_no][3][1] = crop_y_n;
+
+    rect_tex_vid[vid_plane_no][4][0] = crop_x_n;
+    rect_tex_vid[vid_plane_no][4][1] = crop_y_n + crop_h_n;
+
+    rect_tex_vid[vid_plane_no][5][0] = crop_x_n + crop_w_n;
+    rect_tex_vid[vid_plane_no][5][1] = crop_y_n + crop_h_n;
 
     glGenTextures (1, &tex_obj_vid[vid_plane_no]);
     glBindTexture(GL_TEXTURE_STREAM_IMG, tex_obj_vid[vid_plane_no]);
@@ -1012,8 +1065,10 @@ int main(int argc, char *argv[])
 
                 glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0,
                                       rect_vertices_vid[i]);
+/*                glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0,
+                                      rect_texcoord); */
                 glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0,
-                                      rect_texcoord);
+                                      &rect_tex_vid[i][0][0]);
                 glEnableVertexAttribArray(0);
                 glEnableVertexAttribArray(1);
                 glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1060,8 +1115,11 @@ int main(int argc, char *argv[])
                 /* Draw the plane */
                 glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 
                                       rect_vertices_gfx[i]);
+/*                glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 
+                                      rect_texcoord); */
                 glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 
-                                      rect_texcoord);
+                                      &rect_tex_gfx[i][0][0]);  
+
                 glEnableVertexAttribArray(0);
                 glEnableVertexAttribArray(1);
                 glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1091,8 +1149,10 @@ int main(int argc, char *argv[])
 
                 glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0,
                                       rect_vertices_vid[i]);
+/*                glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0,
+                                      rect_texcoord); */
                 glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0,
-                                      rect_texcoord);
+                                      &rect_tex_vid[i][0][0]);
                 glEnableVertexAttribArray(0);
                 glEnableVertexAttribArray(1);
                 glDrawArrays(GL_TRIANGLES, 0, 6);

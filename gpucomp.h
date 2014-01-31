@@ -68,6 +68,8 @@
 #define GFX_LINUXFBOFS_GLOB_ALPHA_EN 1 /* glob_alpha_en */
 #define GFX_LINUXFBOFS_GLOBAL_ALPHA (0.5) /*global_alpha */
 #define GFX_LINUXFBOFS_ROTATE (0.0)    /* rotate */
+#define GFX_LINUXFBOFS_DEFAULT_CROP_X 0
+#define GFX_LINUXFBOFS_DEFAULT_CROP_Y 0
 
 
 /* Default values for gpuvsink (video)  parameters */
@@ -78,6 +80,8 @@
 #define VID_GPUVSINK_HEIGHT (2.0)    /* height */
 #define VID_GPUVSINK_ROTATE (0.0)    /* rotate */
 #define VID_OVERLAYONGFX     0       /* disable video overlay on gfx */
+#define VID_DEFAULT_CROP_X 0
+#define VID_DEFAULT_CROP_Y 0
 
 
 
@@ -99,6 +103,10 @@ typedef struct
         unsigned long data_ph_addr;  /* physical address of the gfx  buffer   */
         int width;                   /* gfx plane width in pixels             */
         int height;                  /* gfx plane height in pixels            */
+        int crop_x;                  /* top-left position where the cropping  */ 
+        int crop_y;                  /* should start (in pixels)              */
+        int crop_width;              /* Required resolution */
+        int crop_height;
         unsigned int pixel_format;   /* fourcc pixel format                   */
         int enable_blending;         /* 1 - blending enabled;  0 - disabled   */
         int enable_global_alpha;     /* 1 - global alpha;  0 - pixel alpha    */
@@ -130,6 +138,10 @@ typedef struct
         int count;     /* Number of video buffers */
         int width;     /* video frame width in pixels */
         int height;    /* video frame height in pixels */
+        int crop_x;                  /* top-left position where the cropping  */
+        int crop_y;                  /* should start (in pixels)              */
+        int crop_width;              /* Required resolution */
+        int crop_height;
         unsigned int fourcc;    /* pixel format */
         unsigned long phyaddr[MAX_VIDEO_BUFFERS_PER_CHANNEL]; /* Physical addresses of video buffers */
     } in;

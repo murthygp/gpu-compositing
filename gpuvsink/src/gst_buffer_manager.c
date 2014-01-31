@@ -304,6 +304,18 @@ gst_buffer_manager_new (GstElement * elem, videoConfig_s videoConfig, int count,
   videoConfig.in.count   = count;
   videoConfig.in.height  = height;
   videoConfig.in.width   = width;
+   
+  if (videoConfig.in.crop_width  == 0) videoConfig.in.crop_width = width;
+  if (videoConfig.in.crop_height == 0) videoConfig.in.crop_height = height;
+  if ((videoConfig.in.crop_x+videoConfig.in.crop_width) > width) {
+    printf (" Invalid crop_x+crop_w value: %d \n",(videoConfig.in.crop_x+videoConfig.in.crop_width));
+    exit (0);
+  }
+  if ((videoConfig.in.crop_y+videoConfig.in.crop_height) > height) {
+    printf (" Invalid crop_y+crop_h value: %d \n",(videoConfig.in.crop_y+videoConfig.in.crop_height));
+    exit (0);
+  }
+
   if(format == GST_VIDEO_FORMAT_YUY2) {
     videoConfig.in.fourcc  = GST_MAKE_FOURCC ('Y', 'U', 'Y', 'V');
   }
@@ -415,7 +427,7 @@ gst_buffer_manager_dispose (GstBufferClassBufferPool * pool)
       {
           printf("Error in writing to named pipe: %s \n", VIDEO_CONFIG_AND_DATA_FIFO_NAME);
       }
-      DEBUG_PRINTF ((" sending close command to the config fifo - %s is successful\n", video_config_fifo));
+      DEBUG_PRINTF ((" sending close command to the config fifo - %s is successful\n", gpuvsink->video_config_fifo));
 
       usleep (50000);
       close(gpuvsink->fd_video_cfg);

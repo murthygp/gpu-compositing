@@ -66,7 +66,7 @@ typedef struct _GstBufferClassSink GstBufferClassSink;
 typedef struct _GstBufferClassSinkClass GstBufferClassSinkClass;
 
 
-#define PROP_DEF_QUEUE_SIZE 8 
+#define PROP_DEF_QUEUE_SIZE 12 
 #define GST_BC_MIN_BUFFERS  2
 #define GST_BC_MAX_BUFFERS 12
 #define MAX_QUEUE 3
@@ -93,11 +93,6 @@ struct _GstBufferClassSink
   videoConfig_s videoConfig;
   int    fd_video_cfg;
   int channel_no;
-/*  GstBufferClassBuffer *bcbuf_prev1;
-  GstBufferClassBuffer *bcbuf_prev2;
-  GstBufferClassBuffer *bcbuf_prev3;
-  GstBufferClassBuffer *bcbuf_prev4;
-  GstBufferClassBuffer *bcbuf_prev5; */
 
   GstBuffer *bcbuf_prev1;
   GstBuffer *bcbuf_prev2;

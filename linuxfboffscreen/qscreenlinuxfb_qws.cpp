@@ -300,6 +300,11 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
     float oglobal_alpha = GFX_LINUXFBOFS_GLOBAL_ALPHA; 
     float orotate = GFX_LINUXFBOFS_ROTATE;
 
+    int crop_x = GFX_LINUXFBOFS_DEFAULT_CROP_X;
+    int crop_y = GFX_LINUXFBOFS_DEFAULT_CROP_Y;
+    int crop_w  = 0;
+    int crop_h = 0;
+
     unsigned long data_phy;
     gfxCfg_s gfxCfg;
     int fd_gfxplane, n;
@@ -320,7 +325,38 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         printf (" Error: Exceeding the number of GFX planes supported <0 to 3>\n");
         exit (0);
     }
-   
+    
+    /* Cropping x - right position where the cropping should start */
+    QRegExp cropx(QLatin1String("crop_x=?(\\d+)"));
+    int cropxIdx = args.indexOf(cropx);
+    if (cropxIdx >= 0) {
+        cropx.exactMatch(args.at(cropxIdx));
+        crop_x = cropx.cap(1).toInt();
+    }
+
+    /* Cropping y - top position where the cropping should start */  
+    QRegExp cropy(QLatin1String("crop_y=?(\\d+)"));
+    int cropyIdx = args.indexOf(cropy);
+    if (cropyIdx >= 0) {
+        cropy.exactMatch(args.at(cropyIdx));
+        crop_y = cropy.cap(1).toInt();
+    }
+
+    /* Cropping width - required width */
+    QRegExp cropw(QLatin1String("crop_w=?(\\d+)"));
+    int cropwIdx = args.indexOf(cropw);
+    if (cropwIdx >= 0) {
+        cropw.exactMatch(args.at(cropwIdx));
+        crop_w = cropw.cap(1).toInt();
+    }
+
+    /* Cropping height - required height */
+    QRegExp croph(QLatin1String("crop_h=?(\\d+)"));
+    int crophIdx = args.indexOf(croph);
+    if (crophIdx >= 0) {
+        croph.exactMatch(args.at(crophIdx));
+        crop_h = croph.cap(1).toInt();
+    }
 
     DEBUG_PRINTF ((" Graphics Plane number gfx_no: %d\n", gfx_plane_no));
  
@@ -639,6 +675,33 @@ bool QLinuxFbScreenOfs::connect(const QString &displaySpec)
         gfxCfg.input_params_valid = 1;
         gfxCfg.in_g.width         = dw;
         gfxCfg.in_g.height        = dh;
+  
+        if (crop_x > dw || crop_x < 0) {
+           printf (" Invalid crop_x value: %d \n",crop_x);
+           exit (0);
+        }
+        if (crop_y > dw || crop_y < 0) {
+           printf (" Invalid crop_y value: %d \n",crop_y);
+           exit(0);
+        }
+      
+        if (crop_w == 0) crop_w = dw;
+        if (crop_h == 0) crop_h = dh;
+        if ((crop_x+crop_w) > dw || crop_w < 0) {
+           printf (" Invalid crop_w value: %d \n",crop_w);
+           exit (0);
+        }
+        if ((crop_y+crop_h) > dw || crop_h < 0) {
+           printf (" Invalid crop_h value: %d \n",crop_h);
+           exit(0);
+        }
+        
+
+        gfxCfg.in_g.crop_x = crop_x;
+        gfxCfg.in_g.crop_y = crop_y;
+        gfxCfg.in_g.crop_width  = crop_w;
+        gfxCfg.in_g.crop_height = crop_h;
+
         if (vinfo.bits_per_pixel == 16) {
             gfxCfg.in_g.pixel_format = BC_PIX_FMT_RGB565;
         } else 
